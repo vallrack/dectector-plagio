@@ -83,7 +83,7 @@ function BrandBadge({ file }: { file: CodeFile }) {
           borderColor: color + '55',
           backgroundColor: color + '18',
           color: color,
-          ringColor: color,
+          boxShadow: ring ? `0 0 0 ${ring === 'ring-2' ? '2px' : '1px'} ${color}` : undefined,
         }}
       >
         <span

@@ -3,23 +3,32 @@
 import React from 'react';
 import { ArrowRight, BarChart3, FileSearch, ShieldAlert, Zap, Lock, Code2 } from 'lucide-react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
+
+const container: Variants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15
+    }
+  }
+};
+
+const item: Variants = {
+  hidden: { opacity: 0, y: 30 },
+  show: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { 
+      type: "spring" as const, 
+      stiffness: 300, 
+      damping: 24 
+    } 
+  }
+};
 
 export default function Home() {
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.15
-      }
-    }
-  };
-
-  const item = {
-    hidden: { opacity: 0, y: 30 },
-    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-  };
 
   return (
     <div className="relative min-h-[calc(100vh-6rem)] flex flex-col justify-center overflow-hidden">
@@ -74,26 +83,26 @@ export default function Home() {
         </motion.div>
 
         <motion.div 
-          variants={container}
+          variants={container as any}
           initial="hidden"
           animate="show"
           className="grid grid-cols-1 md:grid-cols-3 gap-8"
         >
-          <motion.div variants={item}>
+          <motion.div variants={item as any}>
             <FeatureCard 
               icon={<FileSearch className="w-8 h-8 text-blue-400" />}
               title="Copyleaks Integration"
               description="Potenciado por la API comercial líder para detectar rastros de GPT-4, Claude y Gemini con precisión milimétrica."
             />
           </motion.div>
-          <motion.div variants={item}>
+          <motion.div variants={item as any}>
             <FeatureCard 
               icon={<Code2 className="w-8 h-8 text-purple-400" />}
               title="Multiformato y +90 Lenguajes"
               description="Sube archivos ZIP con proyectos enteros, o documentos individuales como Word, PDF y Excel. Lo leemos todo."
             />
           </motion.div>
-          <motion.div variants={item}>
+          <motion.div variants={item as any}>
             <FeatureCard 
               icon={<Lock className="w-8 h-8 text-cyan-400" />}
               title="Privacidad Extrema"
