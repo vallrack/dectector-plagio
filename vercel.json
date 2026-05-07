@@ -1,5 +1,13 @@
 {
   "version": 2,
+  "experimentalServices": {
+    "frontend": {
+      "routePrefix": "/"
+    },
+    "api": {
+      "routePrefix": "/api"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
