@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { Shield, LayoutDashboard, FileUp, Settings, LogOut } from 'lucide-react';
 import Link from 'next/link';
