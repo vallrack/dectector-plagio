@@ -1,0 +1,52 @@
+services:
+  # Backend Service (FastAPI + SQLite con Persistencia)
+  - type: web
+    name: plagiarism-detector-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # Definimos la carpeta de trabajo para que el import 'from .models' funcione
+    rootDirectory: backend
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: DATABASE_URL
+        value: sqlite:////opt/render/project/src/data/plagiarism_detector.db
+      - key: COPYLEAKS_EMAIL
+        sync: false
+      - key: COPYLEAKS_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: COHERE_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+    # Persistencia para evitar perder los resultados al reiniciar el servidor
+    disk:
+      name: plagiarism-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+
+  # Frontend Service (Next.js)
+  - type: web
+    name: plagiarism-detector-frontend
+    env: node
+    plan: free
+    rootDirectory: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: plagiarism-detector-backend
+          property: host
