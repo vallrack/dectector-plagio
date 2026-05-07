@@ -3,7 +3,8 @@
   "experimentalServices": {
     "frontend": {
       "mount": "/",
-      "framework": "nextjs"
+      "framework": "nextjs",
+      "root": "frontend"
     },
     "api": {
       "mount": "/api",
