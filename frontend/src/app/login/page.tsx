@@ -89,7 +89,6 @@ export default function LoginPage() {
                   className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-12 py-4 outline-none focus:border-primary/50 focus:bg-white/10 transition-all text-lg"
                   placeholder="••••••••"
                   required
-                  maxLength={72}
                 />
                 <button
                   type="button"
