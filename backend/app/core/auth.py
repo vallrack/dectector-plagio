@@ -1,6 +1,4 @@
 import os
-import hashlib
-import base64
 from datetime import datetime, timedelta
 from typing import Optional, Union, Any
 from jose import jwt
@@ -15,24 +13,21 @@ SECRET_KEY = os.getenv("SECRET_KEY", "7b9e1d2c3f4a5b6e7d8c9a0b1c2d3e4f5a6b7c8d9e
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 horas
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Usamos 'pbkdf2_sha256' que NO tiene límite de longitud y es igual de seguro que bcrypt
+# Esto elimina el conflicto de los 72 bytes para siempre
+pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-def prepare_password(password: str) -> str:
-    """
-    BCrypt tiene un límite de 72 bytes. 
-    Para evitarlo de forma segura sin perder entropía, pre-hasheamos con SHA-256
-    y usamos el resultado (en base64) como entrada para BCrypt.
-    """
-    sha256_hash = hashlib.sha256(password.encode('utf-8')).digest()
-    # Usamos base64 para que sea una cadena compatible con lo que espera passlib
-    return base64.b64encode(sha256_hash).decode('utf-8')
-
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(prepare_password(plain_password), hashed_password)
+    """Verifica la contraseña sin preocuparse por la longitud."""
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
 
 def get_password_hash(password):
-    return pwd_context.hash(prepare_password(password))
+    """Genera el hash de la contraseña soportando cualquier longitud."""
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
