@@ -34,6 +34,7 @@ class CodeFile(SQLModel, table=True):
     attribution_confidence: float = 0.0
     brand_color: Optional[str] = None
     analysis_engine: Optional[str] = "LuminaShield"
+    ai_analysis: Optional[str] = None # Almacena JSON con evidencias detalladas
 
 # Configuracion de Motor Dinamico
 DATABASE_URL = os.getenv("DATABASE_URL")

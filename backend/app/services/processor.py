@@ -2,6 +2,7 @@ import zipfile
 import io
 import asyncio
 import os
+import json
 from ..core.ai_engine import AIEngine
 from ..models.database import CodeFile, Project
 from sqlmodel import Session, select
@@ -34,6 +35,7 @@ class FileProcessor:
             attribution_confidence=analysis.get("attribution_confidence", 0.0),
             brand_color=analysis.get("brand_color"),
             analysis_engine=analysis_engine,
+            ai_analysis=json.dumps(analysis.get("army_details", [])) if analysis.get("army_details") else None
         )
 
     @staticmethod
@@ -62,6 +64,7 @@ class FileProcessor:
                     analysis["score"] = round((army_score * 0.7) + (local_score * 0.3), 2)
                 
                 analysis["reasoning"] = f"Consenso de IA ({len(army_result['army_details'])} modelos): {army_result['army_verdict']}"
+                analysis["army_details"] = army_result["army_details"]
                 analysis_engine += " + AI Army"
 
         # 2. Consultar a Copyleaks si sigue habiendo sospechas
