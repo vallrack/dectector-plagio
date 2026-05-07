@@ -1,0 +1,46 @@
+# Entornos virtuales
+backend/venv/
+venv/
+.venv/
+env/
+
+# Modulos de Node
+frontend/node_modules/
+node_modules/
+
+# Cache de Next.js y Build
+frontend/.next/
+.next/
+out/
+build/
+
+# Bases de Datos Locales
+backend/plagiarism_detector.db
+*.db
+*.sqlite3
+
+# Secretos y Configuracion Local (MUY IMPORTANTE)
+backend/.env
+frontend/.env
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+backend/__pycache__/
+
+# Logs y Temporales
+*.log
+run_log.txt
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
