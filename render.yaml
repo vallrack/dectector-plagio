@@ -11,7 +11,11 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
-      # Nota: Sin Disk en el plan gratuito, la base de datos se reiniciará en cada despliegue
+      # Conexión automática a la base de datos de abajo
+      - key: DATABASE_URL
+        fromDatabase:
+          name: plagiarism-db
+          property: connectionString
       - key: COPYLEAKS_EMAIL
         sync: false
       - key: COPYLEAKS_API_KEY
@@ -43,3 +47,9 @@ services:
           type: web
           name: plagiarism-detector-backend
           property: host
+
+# Base de datos PostgreSQL (Plan gratuito de Render)
+databases:
+  - name: plagiarism-db
+    plan: free
+    region: oregon
