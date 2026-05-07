@@ -13,10 +13,16 @@ passlib[bcrypt]
 aiofiles
 reportlab
 python-magic
-
 python-dotenv
 copyleaks
 PyMuPDF
 python-docx
 openpyxl
 psycopg2-binary
+
+# AI Army SDKs
+openai
+google-generativeai
+groq
+anthropic
+cohere

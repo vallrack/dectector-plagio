@@ -1,8 +1,11 @@
 import zipfile
 import io
+import asyncio
+import os
 from ..core.ai_engine import AIEngine
 from ..models.database import CodeFile, Project
 from sqlmodel import Session, select
+from .army_service import ArmyService
 
 
 class FileProcessor:
@@ -34,42 +37,61 @@ class FileProcessor:
         )
 
     @staticmethod
-    def _run_analysis(content: str) -> tuple[dict, str]:
+    async def _run_analysis(content: str) -> tuple[dict, str]:
         """
-        Run the heuristic engine.  If the file is suspicious, also run
-        Copyleaks for a second opinion.  Returns (analysis_dict, engine_label).
+        Run the heuristic engine + AI Army Consensus + Copyleaks.
         """
         analysis_engine = "LuminaShield"
         analysis = AIEngine.detect_ai_signature(content)
 
-        if analysis["is_suspicious"]:
+        # 1. Consultar al Ejército de IA (Consenso multi-modelo)
+        army_keys = ["OPENAI_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "DEEPSEEK_API_KEY"]
+        has_army = any(os.getenv(k) for k in army_keys)
+
+        if has_army:
+            army_result = await ArmyService.get_consensus(content)
+            if army_result["army_details"]:
+                # Mezclamos el score del ejército con el local (Ponderación 70% Ejército / 30% Local)
+                local_score = analysis["score"]
+                army_score = army_result["army_score"]
+                
+                # Si el ejército está muy seguro, le damos prioridad
+                if army_score > 80 or army_score < 20:
+                    analysis["score"] = army_score
+                else:
+                    analysis["score"] = round((army_score * 0.7) + (local_score * 0.3), 2)
+                
+                analysis["reasoning"] = f"Consenso de IA ({len(army_result['army_details'])} modelos): {army_result['army_verdict']}"
+                analysis_engine += " + AI Army"
+
+        # 2. Consultar a Copyleaks si sigue habiendo sospechas
+        if analysis["score"] > 60:
             from ..services.copyleaks_service import CopyleaksService
             deep_result = CopyleaksService.analyze_code(content)
 
             if "score" in deep_result:
-                # Copyleaks overrides the score – keep our brand attribution
+                # Copyleaks suele ser el estándar de oro si está disponible
                 analysis["score"] = deep_result["score"]
-                analysis["reasoning"] = deep_result.get("reasoning", "")
-
-                # Only override brand if Copyleaks returned something specific
+                if not analysis.get("reasoning"):
+                    analysis["reasoning"] = deep_result.get("reasoning", "")
+                
                 if deep_result.get("detected_model"):
                     analysis["detected_model"] = deep_result["detected_model"]
 
-                analysis_engine = "LuminaShield + Copyleaks"
+                analysis_engine += " + Copyleaks"
 
         return analysis, analysis_engine
 
     # ── process_zip ──────────────────────────────────────────────────────────
 
     @staticmethod
-    def process_zip(zip_content: bytes, project_id: int, session: Session):
+    async def process_zip(zip_content: bytes, project_id: int, session: Session):
         """Decompress a ZIP in memory and analyse every supported file."""
         from ..services.document_extractor import DocumentExtractor
 
         with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
             processed = 0
             for filename in z.namelist():
-                # Ignore folders and hidden/junk files
                 if (
                     filename.startswith("__MACOSX/")
                     or "/." in filename
@@ -86,7 +108,8 @@ class FileProcessor:
 
                 ext = filename.split(".")[-1].lower() if "." in filename else "txt"
 
-                analysis, analysis_engine = FileProcessor._run_analysis(content)
+                # Llamada asíncrona al análisis
+                analysis, analysis_engine = await FileProcessor._run_analysis(content)
 
                 code_file = FileProcessor._build_code_file(
                     filename, ext, content, project_id, analysis, analysis_engine
@@ -114,7 +137,7 @@ class FileProcessor:
     # ── process_single_file ──────────────────────────────────────────────────
 
     @staticmethod
-    def process_single_file(
+    async def process_single_file(
         content_bytes: bytes, filename: str, project_id: int, session: Session
     ):
         """Analyse a single uploaded file."""
@@ -126,7 +149,7 @@ class FileProcessor:
 
         ext = filename.split(".")[-1].lower() if "." in filename else "txt"
 
-        analysis, analysis_engine = FileProcessor._run_analysis(content)
+        analysis, analysis_engine = await FileProcessor._run_analysis(content)
 
         code_file = FileProcessor._build_code_file(
             filename, ext, content, project_id, analysis, analysis_engine
@@ -137,7 +160,6 @@ class FileProcessor:
         # Update project
         project = session.get(Project, project_id)
         if project:
-            # Recalculate average across all files in the project
             all_files = session.exec(
                 select(CodeFile).where(CodeFile.project_id == project_id)
             ).all()
