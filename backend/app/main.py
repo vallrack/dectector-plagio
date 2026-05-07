@@ -7,6 +7,7 @@ from .services.processor import FileProcessor
 from datetime import datetime
 
 from .api import auth
+from .core.auth import get_current_user, User
 
 app = FastAPI(title="Detector de Plagio e IA API")
 
@@ -29,7 +30,8 @@ def on_startup():
 async def global_exception_handler(request: Request, exc: Exception):
     """Ensure CORS headers are present even on unhandled 500 errors."""
     import logging
-    logging.getLogger("uvicorn.error").error(f"Unhandled error: {exc}", exc_info=True)
+    logger = logging.getLogger("uvicorn.error")
+    logger.error(f"Unhandled error: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"detail": str(exc)},
@@ -44,7 +46,8 @@ def read_root():
 async def upload_project(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
 ):
     allowed_extensions = {
         '.zip', '.py', '.js', '.ts', '.tsx', '.java', '.cpp', '.c', '.html', '.css',
@@ -61,7 +64,7 @@ async def upload_project(
         raise HTTPException(status_code=400, detail=f"Extension {ext} not supported")
     
     # Crear registro del proyecto
-    project = Project(name=file.filename, user_id=1)
+    project = Project(name=file.filename, user_id=current_user.id)
     session.add(project)
     session.commit()
     session.refresh(project)
