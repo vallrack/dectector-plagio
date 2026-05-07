@@ -239,52 +239,52 @@ export default function ProjectDetailPage() {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-[1600px] mx-auto py-6 px-4 md:px-8">
 
       {/* ── Header ── */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-6">
+      <header className="flex flex-col lg:flex-row lg:items-end justify-between mb-8 gap-6">
         <div>
-          <div className="flex items-center gap-4 mb-3">
-            <h1 className="text-4xl font-extrabold tracking-tight">{project.name}</h1>
-            <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-md text-xs font-mono text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-3 md:gap-4 mb-3">
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">{project.name}</h1>
+            <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-md text-[10px] md:text-xs font-mono text-muted-foreground">
               ID: {project.id}
             </span>
           </div>
-          <div className="flex items-center gap-8 text-sm font-medium">
+          <div className="flex flex-wrap items-center gap-4 md:gap-8 text-xs md:sm font-medium">
             <span className="flex items-center gap-2 text-muted-foreground">
               <FileCode className="w-4 h-4 text-blue-400" />
-              {project.files_count} documentos
+              {project.files_count} docs
             </span>
             <span className="flex items-center gap-2 text-muted-foreground">
               <BarChart className="w-4 h-4 text-purple-400" />
-              Score Promedio: <strong className="text-foreground">{averageScore.toFixed(1)}% IA</strong>
+              Promedio: <strong className="text-foreground">{averageScore.toFixed(1)}%</strong>
             </span>
-            <span className="flex items-center gap-2 text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
+            <span className="flex items-center gap-2 text-green-400 bg-green-400/10 px-3 py-1 rounded-full text-[10px] md:text-xs">
               <ShieldCheck className="w-4 h-4" />
-              Análisis Completado
+              Completado
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 md:gap-6">
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={handleDownloadReport}
-            className="glass-panel px-6 py-3 rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-white/10 transition-all text-white"
+            className="glass-panel px-6 py-4 md:py-3 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition-all text-white"
           >
             <FileText className="w-4 h-4" />
-            Exportar Informe PDF
+            Exportar PDF
           </motion.button>
-          <div className="glass p-2 rounded-2xl flex items-center gap-4 border-white/10">
-            <span className="text-xs font-bold uppercase tracking-widest pl-3 text-muted-foreground">Riesgo Global</span>
+          <div className="glass p-3 md:p-2 rounded-2xl flex items-center justify-between sm:justify-start gap-4 border-white/10">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Riesgo Global</span>
             <Semaphore score={averageScore} size="lg" />
           </div>
         </div>
       </header>
 
       {/* ── Layout ── */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-[calc(100vh-180px)]">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:h-[calc(100vh-180px)]">
 
         {/* ── Sidebar ── */}
-        <div className="md:col-span-4 lg:col-span-3 glass-panel rounded-3xl flex flex-col overflow-hidden">
+        <div className="col-span-1 md:col-span-4 lg:col-span-3 glass-panel rounded-3xl flex flex-col h-[500px] md:h-full overflow-hidden">
           <div className="p-5 border-b border-white/5 bg-black/20">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -371,7 +371,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* ── Main detail panel ── */}
-        <div className="md:col-span-8 lg:col-span-9 flex flex-col h-full">
+        <div className="col-span-1 md:col-span-8 lg:col-span-9 flex flex-col h-full min-h-[600px] md:min-h-0">
           <AnimatePresence mode="wait">
             {selectedFile ? (
               <motion.div
@@ -379,7 +379,7 @@ export default function ProjectDetailPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="glass-panel rounded-3xl p-6 md:p-8 flex flex-col h-full overflow-hidden"
+                className="glass-panel rounded-3xl p-4 md:p-8 flex flex-col h-full overflow-hidden"
               >
                 {/* File header */}
                 <div className="flex items-start justify-between mb-8">

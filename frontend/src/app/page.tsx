@@ -53,11 +53,11 @@ export default function Home() {
             <span className="text-sm font-medium tracking-wide">Ahora integrado con Copyleaks AI</span>
           </motion.div>
           
-          <h1 className="text-6xl md:text-8xl font-extrabold mb-8 tracking-tighter leading-[1.1]">
+          <h1 className="text-4xl sm:text-6xl md:text-8xl font-extrabold mb-8 tracking-tighter leading-[1.1]">
             Detecta la <span className="text-gradient">Firma de la IA</span> <br className="hidden md:block" /> en Segundos
           </h1>
           
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed mb-12">
+          <p className="text-lg md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed mb-12">
             El sistema de protección académica más avanzado. Analiza más de 90 lenguajes, PDFs, Word y Excel para garantizar la total originalidad.
           </p>
           
@@ -117,9 +117,9 @@ export default function Home() {
 
 function FeatureCard({ icon, title, description }: { icon: React.ReactNode, title: string, description: string }) {
   return (
-    <div className="glass-panel p-10 rounded-3xl h-full group hover:glow-primary transition-all duration-500 relative overflow-hidden">
+    <div className="glass-panel p-6 md:p-10 rounded-3xl h-full group hover:glow-primary transition-all duration-500 relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      <div className="bg-white/5 w-16 h-16 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
+      <div className="bg-white/5 w-12 h-12 md:w-16 md:h-16 rounded-2xl flex items-center justify-center mb-6 md:mb-8 group-hover:scale-110 group-hover:bg-primary/20 transition-all duration-300">
         {icon}
       </div>
       <h3 className="text-2xl font-bold mb-4 tracking-tight">{title}</h3>
