@@ -8,7 +8,7 @@ services:
     buildCommand: pip install -r backend/requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     # Definimos la carpeta de trabajo para que el import 'from .models' funcione
-    rootDirectory: backend
+    rootDir: backend
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
@@ -41,7 +41,7 @@ services:
     name: plagiarism-detector-frontend
     env: node
     plan: free
-    rootDirectory: frontend
+    rootDir: frontend
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
