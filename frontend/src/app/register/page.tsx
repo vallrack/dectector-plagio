@@ -6,6 +6,7 @@ import api from '@/lib/api';
 import Link from 'next/link';
 import { Shield, Lock, Mail, Loader2, UserPlus, Eye, EyeOff, Check, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');

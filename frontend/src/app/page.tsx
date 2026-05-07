@@ -28,7 +28,18 @@ const item: Variants = {
   }
 };
 
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+
 export default function Home() {
+  const { user } = useAuth();
+  const router = useRouter();
+
+  React.useEffect(() => {
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router]);
 
   return (
     <div className="relative min-h-[calc(100vh-6rem)] flex flex-col justify-center overflow-hidden">

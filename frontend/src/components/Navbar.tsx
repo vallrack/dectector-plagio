@@ -11,8 +11,8 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { href: '/', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
-    { href: '/upload', label: 'Analizar Proyecto', icon: <FileUp className="w-4 h-4" /> },
+    { href: '/dashboard', label: 'Mis Análisis', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { href: '/upload', label: 'Nuevo Análisis', icon: <FileUp className="w-4 h-4" /> },
     { href: '/settings', label: 'Configuración', icon: <Settings className="w-4 h-4" /> },
   ];
 

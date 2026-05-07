@@ -42,6 +42,31 @@ async def global_exception_handler(request: Request, exc: Exception):
 def read_root():
     return {"message": "AI Plagiarism Detector Backend is running"}
 
+@app.get("/projects")
+def get_user_projects(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    projects = session.exec(
+        select(Project)
+        .where(Project.user_id == current_user.id)
+        .order_by(Project.id.desc())
+    ).all()
+    
+    # También queremos el conteo de archivos para cada proyecto
+    result = []
+    for p in projects:
+        files_count = session.exec(select(CodeFile).where(CodeFile.project_id == p.id)).all()
+        result.append({
+            "id": p.id,
+            "name": p.name,
+            "status": p.status,
+            "files_count": len(files_count),
+            "created_at": p.id # Usamos el ID como proxy de fecha si no tenemos created_at
+        })
+    
+    return result
+
 @app.post("/upload")
 async def upload_project(
     background_tasks: BackgroundTasks,
