@@ -2,21 +2,12 @@
   "version": 2,
   "experimentalServices": {
     "frontend": {
-      "framework": "nextjs",
+      "mount": "/",
       "entrypoint": "frontend/package.json"
     },
     "api": {
+      "mount": "/api",
       "entrypoint": "api/index.py"
     }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/frontend/$1"
-    }
-  ]
+  }
 }
