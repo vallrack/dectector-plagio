@@ -2,24 +2,12 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/api/:path*",
+      "source": "/api/(.*)",
       "destination": "/api/index.py"
-    }
-  ],
-  "redirects": [
-    {
-      "source": "/",
-      "destination": "/frontend"
-    }
-  ],
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python"
     },
     {
-      "src": "frontend/package.json",
-      "use": "@vercel/next"
+      "source": "/(.*)",
+      "destination": "/frontend/$1"
     }
   ]
 }
