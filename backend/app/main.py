@@ -6,7 +6,12 @@ from .models.database import create_db_and_tables, get_session, Project, CodeFil
 from .services.processor import FileProcessor
 from datetime import datetime
 
+from .api import auth
+
 app = FastAPI(title="Detector de Plagio e IA API")
+
+# Incluir rutas de autenticación
+app.include_router(auth.router)
 
 # Configuración de CORS para Next.js
 app.add_middleware(
