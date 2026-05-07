@@ -3,7 +3,7 @@
   "experimentalServices": {
     "frontend": {
       "mount": "/",
-      "entrypoint": "frontend/package.json"
+      "framework": "nextjs"
     },
     "api": {
       "mount": "/api",
