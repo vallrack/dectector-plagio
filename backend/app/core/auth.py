@@ -16,14 +16,19 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 horas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
+def truncate_password(password: str) -> str:
+    """BCrypt tiene un límite estricto de 72 bytes."""
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        # Truncar a 72 bytes y decodificar ignorando errores de caracteres cortados a la mitad
+        return password_bytes[:72].decode('utf-8', 'ignore')
+    return password
+
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    return pwd_context.verify(truncate_password(plain_password), hashed_password)
 
 def get_password_hash(password):
-    # BCrypt tiene un límite de 72 caracteres
-    if len(password) > 72:
-        password = password[:72]
-    return pwd_context.hash(password)
+    return pwd_context.hash(truncate_password(password))
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()

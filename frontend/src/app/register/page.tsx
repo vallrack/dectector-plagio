@@ -72,6 +72,7 @@ export default function RegisterPage() {
               className="w-full bg-background/50 border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 ring-secondary/50 transition-all"
               placeholder="••••••••"
               required
+              maxLength={72}
             />
           </div>
 
@@ -86,6 +87,7 @@ export default function RegisterPage() {
               className="w-full bg-background/50 border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 ring-secondary/50 transition-all"
               placeholder="••••••••"
               required
+              maxLength={72}
             />
           </div>
 

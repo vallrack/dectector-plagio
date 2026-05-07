@@ -66,6 +66,7 @@ export default function LoginPage() {
               className="w-full bg-background/50 border border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 ring-primary/50 transition-all"
               placeholder="••••••••"
               required
+              maxLength={72}
             />
           </div>
 
