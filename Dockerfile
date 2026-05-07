@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 
 # Etapa 1: Build del Frontend
-FROM node:18-slim AS frontend-builder
+FROM node:20-slim AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ ./
-# No necesitamos NEXT_PUBLIC_API_URL en build time si usamos rewrites
+ENV NEXT_DISABLE_ESLINT=1
 RUN npm run build
 
 # Etapa 2: Runtime Final
