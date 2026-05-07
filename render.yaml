@@ -1,21 +1,11 @@
 services:
-  # Backend Service (FastAPI)
+  # Combo Service (Frontend + Backend en un solo contenedor)
   - type: web
-    name: plagiarism-detector-backend
-    env: python
+    name: plagiarism-detector-combo
+    env: docker
     region: oregon
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    rootDir: backend
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.10.0
-      # Conexión automática a la base de datos de abajo
-      - key: DATABASE_URL
-        fromDatabase:
-          name: plagiarism-db
-          property: connectionString
       - key: COPYLEAKS_EMAIL
         sync: false
       - key: COPYLEAKS_API_KEY
@@ -32,24 +22,3 @@ services:
         sync: false
       - key: XAI_API_KEY
         sync: false
-
-  # Frontend Service (Next.js)
-  - type: web
-    name: plagiarism-detector-frontend
-    env: node
-    plan: free
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    startCommand: npm start
-    envVars:
-      - key: NEXT_PUBLIC_API_URL
-        fromService:
-          type: web
-          name: plagiarism-detector-backend
-          property: host
-
-# Base de datos PostgreSQL (Plan gratuito de Render)
-databases:
-  - name: plagiarism-db
-    plan: free
-    region: oregon
