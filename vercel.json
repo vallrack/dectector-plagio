@@ -2,10 +2,11 @@
   "version": 2,
   "experimentalServices": {
     "frontend": {
-      "routePrefix": "/"
+      "framework": "nextjs",
+      "entrypoint": "frontend/package.json"
     },
     "api": {
-      "routePrefix": "/api"
+      "entrypoint": "api/index.py"
     }
   },
   "rewrites": [
