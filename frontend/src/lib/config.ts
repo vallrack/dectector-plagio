@@ -2,21 +2,26 @@
  * Configuración dinámica del backend.
  */
 const getBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+
   if (typeof window !== 'undefined') {
-    // Si estamos en Vercel o produccion, la API suele estar en el mismo dominio bajo /api
-    // Pero como tenemos el rewrite en vercel.json, podemos usar el path relativo o absoluto
-    
+    // Si hay una variable de entorno definida (como en Render), usarla prioritariamente
+    if (envUrl) {
+      // Asegurarse de que tenga el protocolo
+      return envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
+    }
+
     // Si es localhost (desarrollo local)
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
        return `http://${window.location.hostname}:8001`;
     }
     
-    // En produccion (Vercel), el backend responde en el mismo dominio
+    // Fallback: En la misma URL bajo /api (estilo Vercel Proxy)
     return `${window.location.protocol}//${window.location.host}/api`;
   }
   
   // SSR (Server Side Rendering)
-  return process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
+  return envUrl || 'http://127.0.0.1:8001';
 };
 
 export const API_BASE_URL = getBaseUrl();
