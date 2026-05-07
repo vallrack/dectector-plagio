@@ -1,5 +1,5 @@
 services:
-  # Backend Service (FastAPI + SQLite con Persistencia)
+  # Backend Service (FastAPI)
   - type: web
     name: plagiarism-detector-backend
     env: python
@@ -7,13 +7,11 @@ services:
     plan: free
     buildCommand: pip install -r backend/requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    # Definimos la carpeta de trabajo para que el import 'from .models' funcione
     rootDir: backend
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
-      - key: DATABASE_URL
-        value: sqlite:////opt/render/project/src/data/plagiarism_detector.db
+      # Nota: Sin Disk en el plan gratuito, la base de datos se reiniciará en cada despliegue
       - key: COPYLEAKS_EMAIL
         sync: false
       - key: COPYLEAKS_API_KEY
@@ -30,11 +28,6 @@ services:
         sync: false
       - key: XAI_API_KEY
         sync: false
-    # Persistencia para evitar perder los resultados al reiniciar el servidor
-    disk:
-      name: plagiarism-data
-      mountPath: /opt/render/project/src/data
-      sizeGB: 1
 
   # Frontend Service (Next.js)
   - type: web
