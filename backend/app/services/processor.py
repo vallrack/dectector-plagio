@@ -63,6 +63,33 @@ class FileProcessor:
                 else:
                     analysis["score"] = round((army_score * 0.7) + (local_score * 0.3), 2)
                 
+                # Si el ejército detecta plagio, actualizar la atribución de IA
+                if analysis["score"] > 60:
+                    best_army_model = max(army_result["army_details"], key=lambda x: x.get("probability", 0))
+                    if best_army_model.get("detected_model"):
+                        model_name = best_army_model["detected_model"]
+                        analysis["detected_model"] = model_name
+                        
+                        # Mapeo básico de nombres del ejército a las marcas del AIEngine
+                        brand_map = {
+                            "OpenAI": "ChatGPT (OpenAI)",
+                            "DeepSeek": "DeepSeek",
+                            "xAI": "Grok (xAI)",
+                            "Alibaba": "Qwen (Alibaba)",
+                            "Gemini": "Gemini (Google)",
+                            "Llama": "Groq / Llama",
+                            "Groq": "Groq / Llama"
+                        }
+                        
+                        analysis["detected_brand"] = next((v for k, v in brand_map.items() if k in model_name), model_name)
+                        analysis["brand_color"] = AIEngine.BRAND_COLORS.get(analysis["detected_brand"], "#8B5CF6")
+                        analysis["attribution_confidence"] = best_army_model.get("probability", 80)
+                elif analysis["score"] < 40:
+                    analysis["detected_model"] = "No Identificado (Probable Humano)"
+                    analysis["detected_brand"] = None
+                    analysis["brand_color"] = "#22C55E"
+                    analysis["attribution_confidence"] = 0
+
                 analysis["reasoning"] = f"Consenso de IA ({len(army_result['army_details'])} modelos): {army_result['army_verdict']}"
                 analysis["army_details"] = army_result["army_details"]
                 analysis_engine += " + AI Army"
