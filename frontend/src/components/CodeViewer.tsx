@@ -10,7 +10,7 @@ interface CodeViewerProps {
   highlights?: string[];
 }
 
-const CodeViewer: React.FC<CodeViewerProps> = ({ code, language, theme = 'vs-dark' }) => {
+const CodeViewer: React.FC<CodeViewerProps> = ({ code, language, theme = 'vs-dark', highlights = [] }) => {
   // Mapeo de extensiones a lenguajes compatibles con Monaco
   const getMonacoLanguage = (ext: string) => {
     const map: { [key: string]: string } = {
@@ -52,6 +52,7 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ code, language, theme = 'vs-dar
             const decorations: any[] = [];
             
             highlights.forEach(phrase => {
+              if (!phrase || typeof phrase !== 'string') return;
               const model = editor.getModel();
               if (model) {
                 const matches = model.findMatches(phrase, true, false, false, null, true);

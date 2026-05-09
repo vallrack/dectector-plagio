@@ -158,6 +158,18 @@ function StatCard({
   );
 }
 
+// ─── Utils ───────────────────────────────────────────────────────────────────
+const safeParse = (data: any) => {
+  if (!data) return {};
+  if (typeof data === 'object') return data;
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    console.error('Error parsing JSON:', e);
+    return {};
+  }
+};
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ProjectDetailPage() {
@@ -471,18 +483,22 @@ export default function ProjectDetailPage() {
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {(() => {
-                        try {
-                          const analysis = JSON.parse(selectedFile.ai_analysis);
-                          const evidence = [];
+                        const analysis = safeParse(selectedFile.ai_analysis);
+                        const evidence: string[] = [];
+                        
+                        // Collect evidence from army details
+                        analysis.army_details?.forEach((d: any) => {
+                          if (Array.isArray(d.evidence)) {
+                            evidence.push(...d.evidence.map((e: any) => String(e)));
+                          } else if (d.evidence) {
+                            evidence.push(String(d.evidence));
+                          }
                           
-                          // Collect evidence from army details
-                          analysis.army_details?.forEach((d: any) => {
-                            if (d.evidence) evidence.push(...d.evidence);
-                            if (d.reason) evidence.push(d.reason);
-                          });
-                          
-                          // Unique and limit
-                          const uniqueEvidence = Array.from(new Set(evidence)).slice(0, 5);
+                          if (d.reason) evidence.push(String(d.reason));
+                        });
+                        
+                        // Unique and limit
+                        const uniqueEvidence = Array.from(new Set(evidence)).slice(0, 5);
                           
                           return uniqueEvidence.length > 0 ? (
                             uniqueEvidence.map((ev: any, idx) => (
@@ -508,12 +524,9 @@ export default function ProjectDetailPage() {
                     code={selectedFile.content}
                     language={selectedFile.language === 'txt' ? 'plaintext' : selectedFile.language}
                     highlights={(() => {
-                      try {
-                        const analysis = JSON.parse(selectedFile.ai_analysis || '{}');
-                        return analysis.points_of_interest || [];
-                      } catch (e) {
-                        return [];
-                      }
+                      const analysis = safeParse(selectedFile.ai_analysis);
+                      const poi = analysis.points_of_interest;
+                      return Array.isArray(poi) ? poi.map((p: any) => String(p)) : [];
                     })()}
                   />
                 </div>
