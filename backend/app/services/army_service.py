@@ -22,13 +22,13 @@ class ArmyService:
             prompt = (
                 f"Actúa como un experto forense en código y detección de IA. Analiza si este código fue generado por un modelo de lenguaje.\n"
                 f"CÓDIGO A ANALIZAR:\n{code}\n\n"
-                f"RESPONDE UNICAMENTE CON UN JSON que tenga esta estructura exacta:\n"
+                f"RESPONDE UNICAMENTE CON UN JSON que tenga esta estructura exacta (Usa doble comillas, no comillas simples):\n"
                 f"{{\n"
-                f"  'probability': float (0-100),\n"
-                f"  'reason': 'explicación ejecutiva muy corta',\n"
-                f"  'detected_model': '{name}',\n"
-                f"  'evidence': ['lista de 3-5 evidencias técnicas detalladas como estructura, comentarios, patrones típicos de IA, etc'],\n"
-                f"  'points_of_interest': ['puntos específicos o bloques de código que confirman la sospecha']\n"
+                f"  \"probability\": 95.5,\n"
+                f"  \"reason\": \"explicación ejecutiva muy corta\",\n"
+                f"  \"detected_model\": \"{name}\",\n"
+                f"  \"evidence\": [\"lista de 3-5 evidencias técnicas detalladas como estructura, comentarios, patrones típicos de IA, etc\"],\n"
+                f"  \"points_of_interest\": [\"puntos específicos o bloques de código que confirman la sospecha\"]\n"
                 f"}}\n"
             )
             
@@ -83,13 +83,13 @@ class ArmyService:
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel('gemini-1.5-flash')
             prompt = (
-                f"Analiza este código forensemente. ¿Es IA? Responde solo JSON:\n"
+                f"Analiza este código forensemente. ¿Es IA? Responde solo JSON válido con doble comillas:\n"
                 f"{{\n"
-                f"  'probability': 0-100,\n"
-                f"  'reason': 'resumen corto',\n"
-                f"  'detected_model': 'Gemini',\n"
-                f"  'evidence': ['evidencia 1', 'evidencia 2', '...'],\n"
-                f"  'points_of_interest': ['bloque 1', 'bloque 2']\n"
+                f"  \"probability\": 85,\n"
+                f"  \"reason\": \"resumen corto\",\n"
+                f"  \"detected_model\": \"Gemini\",\n"
+                f"  \"evidence\": [\"evidencia 1\", \"evidencia 2\", \"...\"],\n"
+                f"  \"points_of_interest\": [\"bloque 1\", \"bloque 2\"]\n"
                 f"}}\n\nCÓDIGO:\n{code}"
             )
             response = model.generate_content(prompt)
@@ -108,13 +108,13 @@ class ArmyService:
         try:
             client = AsyncGroq(api_key=api_key)
             prompt = (
-                f"Expert AI Detection. Analyze this code. Response must be JSON only:\n"
+                f"Expert AI Detection. Analyze this code. Response must be valid JSON only (use double quotes):\n"
                 f"{{\n"
-                f"  'probability': 0-100,\n"
-                f"  'reason': 'brief explanation',\n"
-                f"  'detected_model': 'Llama-3-Groq',\n"
-                f"  'evidence': ['technical evidence list'],\n"
-                f"  'points_of_interest': ['specific code parts']\n"
+                f"  \"probability\": 80,\n"
+                f"  \"reason\": \"brief explanation\",\n"
+                f"  \"detected_model\": \"Llama-3-Groq\",\n"
+                f"  \"evidence\": [\"technical evidence list\"],\n"
+                f"  \"points_of_interest\": [\"specific code parts\"]\n"
                 f"}}\n\nCODE:\n{code}"
             )
             response = await client.chat.completions.create(

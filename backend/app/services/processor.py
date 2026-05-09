@@ -164,6 +164,67 @@ class FileProcessor:
                     session.add(project)
                     session.commit()
 
+    # ── process_rar ──────────────────────────────────────────────────────────
+
+    @staticmethod
+    async def process_rar(rar_content: bytes, project_id: int, session: Session):
+        """Decompress a RAR in memory and analyse every supported file."""
+        from ..services.document_extractor import DocumentExtractor
+        import rarfile
+
+        try:
+            with rarfile.RarFile(io.BytesIO(rar_content)) as r:
+                processed = 0
+                for filename in r.namelist():
+                    if (
+                        filename.startswith("__MACOSX/")
+                        or "/." in filename
+                        or filename.endswith("/")
+                    ):
+                        continue
+
+                    with r.open(filename) as f:
+                        content_bytes = f.read()
+
+                    content = DocumentExtractor.extract_text(filename, content_bytes)
+                    if not content or len(content.strip()) < 10:
+                        continue
+
+                    ext = filename.split(".")[-1].lower() if "." in filename else "txt"
+
+                    analysis, analysis_engine = await FileProcessor._run_analysis(content)
+
+                    code_file = FileProcessor._build_code_file(
+                        filename, ext, content, project_id, analysis, analysis_engine
+                    )
+                    session.add(code_file)
+                    processed += 1
+
+                session.commit()
+
+                # Update project summary
+                files = session.exec(
+                    select(CodeFile).where(CodeFile.project_id == project_id)
+                ).all()
+
+                if files:
+                    avg_score = sum(f.ai_score for f in files) / len(files)
+                    project = session.get(Project, project_id)
+                    if project:
+                        project.overall_score = round(avg_score, 2)
+                        project.files_count = len(files)
+                        project.status = "completed"
+                        session.add(project)
+                        session.commit()
+        except Exception as e:
+            import logging
+            logging.error(f"Error procesando RAR: {e}")
+            project = session.get(Project, project_id)
+            if project:
+                project.status = "error"
+                session.add(project)
+                session.commit()
+
     # ── process_single_file ──────────────────────────────────────────────────
 
     @staticmethod

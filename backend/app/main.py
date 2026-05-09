@@ -75,8 +75,8 @@ async def upload_project(
     current_user: User = Depends(get_current_user)
 ):
     allowed_extensions = {
-        '.zip', '.py', '.js', '.ts', '.tsx', '.java', '.cpp', '.c', '.html', '.css',
-        '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md', '.json', '.csv', '.xml', '.yaml', '.yml', '.php', '.rb', '.go', '.rs'
+        '.zip', '.rar', '.py', '.js', '.ts', '.tsx', '.java', '.cpp', '.c', '.html', '.css',
+        '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md', '.json', '.csv', '.xml', '.yaml', '.yml', '.php', '.rb', '.go', '.rs', '.sql'
     }
     ext = '.' + file.filename.split('.')[-1].lower() if '.' in file.filename else ''
     
@@ -100,6 +100,8 @@ async def upload_project(
     # Procesar en segundo plano
     if ext == '.zip':
         background_tasks.add_task(FileProcessor.process_zip, content, project.id, session)
+    elif ext == '.rar':
+        background_tasks.add_task(FileProcessor.process_rar, content, project.id, session)
     else:
         # Es un archivo individual
         background_tasks.add_task(FileProcessor.process_single_file, content, file.filename, project.id, session)

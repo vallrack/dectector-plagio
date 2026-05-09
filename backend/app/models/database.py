@@ -47,7 +47,8 @@ if DATABASE_URL:
     engine = create_engine(DATABASE_URL)
 else:
     # Local (SQLite)
-    sqlite_url = "sqlite:///./plagiarism_detector.db"
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    sqlite_url = f"sqlite:///{os.path.join(BASE_DIR, 'plagiarism_detector.db')}"
     engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
 def create_db_and_tables():
