@@ -8,5 +8,6 @@ cd /app/backend && uvicorn app.main:app --host 0.0.0.0 --port 8001 &
 sleep 5
 
 # Iniciar el Frontend en primer plano (puerto $PORT de Render)
-echo "Iniciando Frontend en puerto $PORT..."
-cd /app/frontend && npm start -- -p $PORT
+# IMPORTANTE: Usar -H 0.0.0.0 para que Render pueda detectar el puerto abierto
+echo "Iniciando Frontend en puerto $PORT (Host 0.0.0.0)..."
+cd /app/frontend && npm start -- -p $PORT -H 0.0.0.0
