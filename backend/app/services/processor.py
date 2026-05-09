@@ -35,7 +35,11 @@ class FileProcessor:
             attribution_confidence=analysis.get("attribution_confidence", 0.0),
             brand_color=analysis.get("brand_color"),
             analysis_engine=analysis_engine,
-            ai_analysis=json.dumps(analysis.get("army_details", [])) if analysis.get("army_details") else None
+            ai_analysis=json.dumps({
+                "army_details": analysis.get("army_details", []),
+                "points_of_interest": analysis.get("points_of_interest", []),
+                "evidence": analysis.get("evidence", [])
+            }) if analysis.get("army_details") or analysis.get("points_of_interest") else None
         )
 
     @staticmethod
@@ -92,6 +96,14 @@ class FileProcessor:
 
                 analysis["reasoning"] = f"Consenso de IA ({len(army_result['army_details'])} modelos): {army_result['army_verdict']}"
                 analysis["army_details"] = army_result["army_details"]
+                
+                # Extraer puntos de interés de todos los modelos del ejército para destacar en el código
+                poi = []
+                for detail in army_result["army_details"]:
+                    if detail.get("points_of_interest"):
+                        poi.extend(detail["points_of_interest"])
+                analysis["points_of_interest"] = list(set(poi)) # unique
+                
                 analysis_engine += " + AI Army"
 
         # 2. Consultar a Copyleaks si sigue habiendo sospechas

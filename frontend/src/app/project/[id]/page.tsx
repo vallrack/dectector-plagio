@@ -38,6 +38,7 @@ interface CodeFile {
   brand_color: string | null;
   analysis_engine: string;
   content: string;
+  ai_analysis: string | null;
 }
 
 interface Project {
@@ -56,18 +57,29 @@ function BrandBadge({ file }: { file: CodeFile }) {
   const confidence = file.attribution_confidence ?? 0;
   const color  = file.brand_color ?? '#6B7280';
 
-  // If no brand detected show a "human" badge
+  // If no brand detected show a "human" badge OR "Unknown AI" if score is high
   if (!brand || file.ai_score < 40) {
+    const isActuallyAI = file.ai_score > 60;
+    
     return (
       <div className="flex flex-col gap-2">
         <div
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border"
-          style={{ borderColor: '#22C55E33', backgroundColor: '#22C55E11', color: '#22C55E' }}
+          className={cn(
+            "inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-bold border",
+            isActuallyAI ? "animate-pulse" : ""
+          )}
+          style={{ 
+            borderColor: isActuallyAI ? '#EF444433' : '#22C55E33', 
+            backgroundColor: isActuallyAI ? '#EF444411' : '#22C55E11', 
+            color: isActuallyAI ? '#EF4444' : '#22C55E' 
+          }}
         >
-          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          Probable Humano
+          <span className={cn("w-2 h-2 rounded-full", isActuallyAI ? "bg-red-400" : "bg-green-400")} />
+          {isActuallyAI ? "IA Genérica" : "Probable Humano"}
         </div>
-        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Confianza: —</span>
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+          {isActuallyAI ? `Score: ${file.ai_score}%` : "Confianza: —"}
+        </span>
       </div>
     );
   }
@@ -446,10 +458,48 @@ export default function ProjectDetailPage() {
                   {/* Identifier */}
                   <StatCard icon={<Fingerprint className="text-blue-300" />} label="Modelo" className="hidden lg:block">
                      <p className="text-[11px] font-mono font-semibold break-all leading-tight mt-1" style={{ color: selectedFile.brand_color ?? '#9CA3AF' }}>
-                        {selectedFile.detected_model || '—'}
+                        {selectedFile.detected_model || (selectedFile.ai_score > 60 ? 'IA Genérica' : '—')}
                      </p>
                   </StatCard>
                 </div>
+
+                {/* Evidence Panel (NEW) */}
+                {selectedFile.ai_analysis && (
+                  <div className="mb-4 bg-red-500/5 border border-red-500/10 rounded-2xl p-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-red-400 mb-3 flex items-center gap-2">
+                      <AlertCircle className="w-3 h-3" /> Evidencias de Generación IA
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {(() => {
+                        try {
+                          const analysis = JSON.parse(selectedFile.ai_analysis);
+                          const evidence = [];
+                          
+                          // Collect evidence from army details
+                          analysis.army_details?.forEach((d: any) => {
+                            if (d.evidence) evidence.push(...d.evidence);
+                            if (d.reason) evidence.push(d.reason);
+                          });
+                          
+                          // Unique and limit
+                          const uniqueEvidence = Array.from(new Set(evidence)).slice(0, 5);
+                          
+                          return uniqueEvidence.length > 0 ? (
+                            uniqueEvidence.map((ev: any, idx) => (
+                              <span key={idx} className="bg-red-500/10 text-red-300 text-[10px] px-2 py-1 rounded-md border border-red-500/10">
+                                • {ev}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground italic">Patrones estructurales típicos de LLMs detectados</span>
+                          );
+                        } catch(e) {
+                          return null;
+                        }
+                      })()}
+                    </div>
+                  </div>
+                )}
 
 
                 {/* Code viewer */}
@@ -457,6 +507,14 @@ export default function ProjectDetailPage() {
                   <CodeViewer
                     code={selectedFile.content}
                     language={selectedFile.language === 'txt' ? 'plaintext' : selectedFile.language}
+                    highlights={(() => {
+                      try {
+                        const analysis = JSON.parse(selectedFile.ai_analysis || '{}');
+                        return analysis.points_of_interest || [];
+                      } catch (e) {
+                        return [];
+                      }
+                    })()}
                   />
                 </div>
               </motion.div>

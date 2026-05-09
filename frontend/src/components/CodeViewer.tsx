@@ -7,6 +7,7 @@ interface CodeViewerProps {
   code: string;
   language: string;
   theme?: string;
+  highlights?: string[];
 }
 
 const CodeViewer: React.FC<CodeViewerProps> = ({ code, language, theme = 'vs-dark' }) => {
@@ -46,7 +47,48 @@ const CodeViewer: React.FC<CodeViewerProps> = ({ code, language, theme = 'vs-dar
           cursorStyle: 'line',
           wordWrap: 'on'
         }}
+        onMount={(editor, monaco) => {
+          if (highlights && highlights.length > 0) {
+            const decorations: any[] = [];
+            
+            highlights.forEach(phrase => {
+              const model = editor.getModel();
+              if (model) {
+                const matches = model.findMatches(phrase, true, false, false, null, true);
+                matches.forEach(match => {
+                  decorations.push({
+                    range: match.range,
+                    options: {
+                      isWholeLine: true,
+                      className: 'ai-highlight-line',
+                      glyphMarginClassName: 'ai-highlight-glyph',
+                      inlineClassName: 'ai-highlight-text',
+                      hoverMessage: { value: 'Patrón típico de generación IA' }
+                    }
+                  });
+                });
+              }
+            });
+
+            editor.deltaDecorations([], decorations);
+          }
+        }}
       />
+      <style jsx global>{`
+        .ai-highlight-line {
+          background-color: rgba(239, 68, 68, 0.15) !important;
+          border-left: 3px solid #ef4444 !important;
+        }
+        .ai-highlight-text {
+          text-decoration: underline wavy #ef4444;
+          font-weight: bold;
+        }
+        .ai-highlight-glyph {
+          background-color: #ef4444;
+          width: 5px !important;
+          margin-left: 5px;
+        }
+      `}</style>
     </div>
   );
 };

@@ -512,17 +512,20 @@ class AIEngine:
         final_score = round(final_score, 2)
 
         # ── Step 8: build human-readable model name ───────────────────────
-        # Require meaningful score AND high confidence to name a brand.
+        # Relaxed thresholds to provide attribution more often
         brand_is_reliable = (
-            final_score >= 65
-            and best_brand_score >= 35
-            and attribution_confidence >= 50
+            final_score >= 60  # lowered from 65
+            and (best_brand_score >= 30 or attribution_confidence >= 40) # more flexible
         )
 
         if not brand_is_reliable:
             if final_score < 40:
                 model_label = "No Identificado (Probable Humano)"
                 brand_color = "#22C55E"
+            elif final_score > 70:
+                # If score is very high but we can't pin down the brand, it's "IA Genérica"
+                model_label = "IA Genérica (Sin Firma Específica)"
+                brand_color = "#6B7280"
             else:
                 model_label = "No Determinado"
                 brand_color = "#6B7280"
