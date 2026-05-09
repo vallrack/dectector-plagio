@@ -1,4 +1,5 @@
 #!/bin/bash
+# v1.0.1 - Deploy trigger
 
 # Iniciar el Backend en segundo plano (puerto 8001)
 echo "Iniciando Backend en puerto 8001..."
