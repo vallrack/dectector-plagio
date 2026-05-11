@@ -483,23 +483,24 @@ export default function ProjectDetailPage() {
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {(() => {
-                        const analysis = safeParse(selectedFile.ai_analysis);
-                        const evidence: string[] = [];
-                        
-                        // Collect evidence from army details
-                        analysis.army_details?.forEach((d: any) => {
-                          if (Array.isArray(d.evidence)) {
-                            evidence.push(...d.evidence.map((e: any) => String(e)));
-                          } else if (d.evidence) {
-                            evidence.push(String(d.evidence));
-                          }
+                        try {
+                          const analysis = safeParse(selectedFile.ai_analysis);
+                          const evidence: string[] = [];
                           
-                          if (d.reason) evidence.push(String(d.reason));
-                        });
-                        
-                        // Unique and limit
-                        const uniqueEvidence = Array.from(new Set(evidence)).slice(0, 5);
+                          // Collect evidence from army details
+                          analysis.army_details?.forEach((d: any) => {
+                            if (Array.isArray(d.evidence)) {
+                              evidence.push(...d.evidence.map((e: any) => String(e)));
+                            } else if (d.evidence) {
+                              evidence.push(String(d.evidence));
+                            }
+                            
+                            if (d.reason) evidence.push(String(d.reason));
+                          });
                           
+                          // Unique and limit
+                          const uniqueEvidence = Array.from(new Set(evidence)).slice(0, 5);
+                            
                           return uniqueEvidence.length > 0 ? (
                             uniqueEvidence.map((ev: any, idx) => (
                               <span key={idx} className="bg-red-500/10 text-red-300 text-[10px] px-2 py-1 rounded-md border border-red-500/10">
