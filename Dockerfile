@@ -14,6 +14,7 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Instalar Node.js en la imagen de Python para ejecutar el frontend
+RUN mkdir -p /app/storage && chmod 777 /app/storage
 RUN apt-get update && apt-get install -y \
     curl \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \

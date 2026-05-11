@@ -99,12 +99,12 @@ async def upload_project(
     
     # Procesar en segundo plano
     if ext == '.zip':
-        background_tasks.add_task(FileProcessor.process_zip, content, project.id, session)
+        background_tasks.add_task(FileProcessor.process_zip, content, project.id)
     elif ext == '.rar':
-        background_tasks.add_task(FileProcessor.process_rar, content, project.id, session)
+        background_tasks.add_task(FileProcessor.process_rar, content, project.id)
     else:
         # Es un archivo individual
-        background_tasks.add_task(FileProcessor.process_single_file, content, file.filename, project.id, session)
+        background_tasks.add_task(FileProcessor.process_single_file, content, file.filename, project.id)
     
     return {
         "project_id": project.id,

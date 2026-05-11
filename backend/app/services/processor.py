@@ -98,11 +98,11 @@ class FileProcessor:
                 analysis["army_details"] = army_result["army_details"]
                 
                 # Extraer puntos de interés de todos los modelos del ejército para destacar en el código
-                poi = []
+                poi = analysis.get("points_of_interest", [])
                 for detail in army_result["army_details"]:
                     if detail.get("points_of_interest"):
                         poi.extend(detail["points_of_interest"])
-                analysis["points_of_interest"] = list(set(poi)) # unique
+                analysis["points_of_interest"] = list(set(poi)) # unique y mezclado con heurísticos
                 
                 analysis_engine += " + AI Army"
 
@@ -125,69 +125,16 @@ class FileProcessor:
         return analysis, analysis_engine
 
     # ── process_zip ──────────────────────────────────────────────────────────
-
     @staticmethod
-    async def process_zip(zip_content: bytes, project_id: int, session: Session):
+    async def process_zip(zip_content: bytes, project_id: int):
         """Decompress a ZIP in memory and analyse every supported file."""
         from ..services.document_extractor import DocumentExtractor
+        from ..models.database import engine
 
-        with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
-            processed = 0
-            for filename in z.namelist():
-                if (
-                    filename.startswith("__MACOSX/")
-                    or "/." in filename
-                    or filename.endswith("/")
-                ):
-                    continue
-
-                with z.open(filename) as f:
-                    content_bytes = f.read()
-
-                content = DocumentExtractor.extract_text(filename, content_bytes)
-                if not content or len(content.strip()) < 10:
-                    continue
-
-                ext = filename.split(".")[-1].lower() if "." in filename else "txt"
-
-                # Llamada asíncrona al análisis
-                analysis, analysis_engine = await FileProcessor._run_analysis(content)
-
-                code_file = FileProcessor._build_code_file(
-                    filename, ext, content, project_id, analysis, analysis_engine
-                )
-                session.add(code_file)
-                processed += 1
-
-            session.commit()
-
-            # Update project summary
-            files = session.exec(
-                select(CodeFile).where(CodeFile.project_id == project_id)
-            ).all()
-
-            if files:
-                avg_score = sum(f.ai_score for f in files) / len(files)
-                project = session.get(Project, project_id)
-                if project:
-                    project.overall_score = round(avg_score, 2)
-                    project.files_count = len(files)
-                    project.status = "completed"
-                    session.add(project)
-                    session.commit()
-
-    # ── process_rar ──────────────────────────────────────────────────────────
-
-    @staticmethod
-    async def process_rar(rar_content: bytes, project_id: int, session: Session):
-        """Decompress a RAR in memory and analyse every supported file."""
-        from ..services.document_extractor import DocumentExtractor
-        import rarfile
-
-        try:
-            with rarfile.RarFile(io.BytesIO(rar_content)) as r:
+        with Session(engine) as session:
+            with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
                 processed = 0
-                for filename in r.namelist():
+                for filename in z.namelist():
                     if (
                         filename.startswith("__MACOSX/")
                         or "/." in filename
@@ -195,7 +142,7 @@ class FileProcessor:
                     ):
                         continue
 
-                    with r.open(filename) as f:
+                    with z.open(filename) as f:
                         content_bytes = f.read()
 
                     content = DocumentExtractor.extract_text(filename, content_bytes)
@@ -204,6 +151,7 @@ class FileProcessor:
 
                     ext = filename.split(".")[-1].lower() if "." in filename else "txt"
 
+                    # Llamada asíncrona al análisis
                     analysis, analysis_engine = await FileProcessor._run_analysis(content)
 
                     code_file = FileProcessor._build_code_file(
@@ -228,49 +176,104 @@ class FileProcessor:
                         project.status = "completed"
                         session.add(project)
                         session.commit()
-        except Exception as e:
-            import logging
-            logging.error(f"Error procesando RAR: {e}")
-            project = session.get(Project, project_id)
-            if project:
-                project.status = "error"
-                session.add(project)
-                session.commit()
+
+    # ── process_rar ──────────────────────────────────────────────────────────
+    @staticmethod
+    async def process_rar(rar_content: bytes, project_id: int):
+        """Decompress a RAR in memory and analyse every supported file."""
+        from ..services.document_extractor import DocumentExtractor
+        from ..models.database import engine
+        import rarfile
+
+        with Session(engine) as session:
+            try:
+                with rarfile.RarFile(io.BytesIO(rar_content)) as r:
+                    processed = 0
+                    for filename in r.namelist():
+                        if (
+                            filename.startswith("__MACOSX/")
+                            or "/." in filename
+                            or filename.endswith("/")
+                        ):
+                            continue
+
+                        with r.open(filename) as f:
+                            content_bytes = f.read()
+
+                        content = DocumentExtractor.extract_text(filename, content_bytes)
+                        if not content or len(content.strip()) < 10:
+                            continue
+
+                        ext = filename.split(".")[-1].lower() if "." in filename else "txt"
+
+                        analysis, analysis_engine = await FileProcessor._run_analysis(content)
+
+                        code_file = FileProcessor._build_code_file(
+                            filename, ext, content, project_id, analysis, analysis_engine
+                        )
+                        session.add(code_file)
+                        processed += 1
+
+                    session.commit()
+
+                    # Update project summary
+                    files = session.exec(
+                        select(CodeFile).where(CodeFile.project_id == project_id)
+                    ).all()
+
+                    if files:
+                        avg_score = sum(f.ai_score for f in files) / len(files)
+                        project = session.get(Project, project_id)
+                        if project:
+                            project.overall_score = round(avg_score, 2)
+                            project.files_count = len(files)
+                            project.status = "completed"
+                            session.add(project)
+                            session.commit()
+            except Exception as e:
+                import logging
+                logging.error(f"Error procesando RAR: {e}")
+                project = session.get(Project, project_id)
+                if project:
+                    project.status = "error"
+                    session.add(project)
+                    session.commit()
 
     # ── process_single_file ──────────────────────────────────────────────────
-
     @staticmethod
     async def process_single_file(
-        content_bytes: bytes, filename: str, project_id: int, session: Session
+        content_bytes: bytes, filename: str, project_id: int
     ):
         """Analyse a single uploaded file."""
         from ..services.document_extractor import DocumentExtractor
+        from ..models.database import engine
 
-        content = DocumentExtractor.extract_text(filename, content_bytes)
-        if not content or len(content.strip()) < 10:
-            return
+        with Session(engine) as session:
+            content = DocumentExtractor.extract_text(filename, content_bytes)
+            if not content or len(content.strip()) < 10:
+                return
 
-        ext = filename.split(".")[-1].lower() if "." in filename else "txt"
+            ext = filename.split(".")[-1].lower() if "." in filename else "txt"
 
-        analysis, analysis_engine = await FileProcessor._run_analysis(content)
+            analysis, analysis_engine = await FileProcessor._run_analysis(content)
 
-        code_file = FileProcessor._build_code_file(
-            filename, ext, content, project_id, analysis, analysis_engine
-        )
-        session.add(code_file)
-        session.commit()
-
-        # Update project
-        project = session.get(Project, project_id)
-        if project:
-            all_files = session.exec(
-                select(CodeFile).where(CodeFile.project_id == project_id)
-            ).all()
-            avg_score = (
-                sum(f.ai_score for f in all_files) / len(all_files) if all_files else analysis["score"]
+            code_file = FileProcessor._build_code_file(
+                filename, ext, content, project_id, analysis, analysis_engine
             )
-            project.overall_score = round(avg_score, 2)
-            project.files_count = len(all_files)
-            project.status = "completed"
-            session.add(project)
+            session.add(code_file)
             session.commit()
+
+            # Update project
+            project = session.get(Project, project_id)
+            if project:
+                all_files = session.exec(
+                    select(CodeFile).where(CodeFile.project_id == project_id)
+                ).all()
+                avg_score = (
+                    sum(f.ai_score for f in all_files) / len(all_files) if all_files else analysis["score"]
+                )
+                project.overall_score = round(avg_score, 2)
+                project.files_count = len(all_files)
+                project.status = "completed"
+                session.add(project)
+                session.commit()

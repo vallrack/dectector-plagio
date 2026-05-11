@@ -44,11 +44,18 @@ if DATABASE_URL:
     # Correccion para URLs de Heroku/Postgres que usan 'postgres://' en vez de 'postgresql://'
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    engine = create_engine(DATABASE_URL)
+    # pool_pre_ping ayuda a reconectar si Supabase cierra la conexión por inactividad
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=20, max_overflow=0)
 else:
     # Local (SQLite)
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    sqlite_url = f"sqlite:///{os.path.join(BASE_DIR, 'plagiarism_detector.db')}"
+    STORAGE_DIR = os.path.join(BASE_DIR, "storage")
+    
+    # Asegurar que el directorio de almacenamiento existe
+    if not os.path.exists(STORAGE_DIR):
+        os.makedirs(STORAGE_DIR, exist_ok=True)
+        
+    sqlite_url = f"sqlite:///{os.path.join(STORAGE_DIR, 'plagiarism_detector.db')}"
     engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
 def create_db_and_tables():

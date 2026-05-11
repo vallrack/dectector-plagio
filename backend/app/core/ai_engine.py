@@ -69,91 +69,128 @@ class AIEngine:
     # ── 2. STYLE FEATURE EXTRACTION ──────────────────────────────────────────
 
     @staticmethod
-    def _extract_features(code: str, normalized: str) -> dict:
-        """Extract all stylometric features needed by fingerprints."""
+    def _extract_features(code: str, normalized: str) -> tuple[dict, list[str]]:
+        """Extract all stylometric features and record matched snippets (POI)."""
         lines = [l for l in code.split('\n') if l.strip()]
         indentations = [len(l) - len(l.lstrip()) for l in code.split('\n') if l.strip()]
         line_count = len(lines)
 
         f = {}
-        f['line_count'] = line_count  # used by scoring to penalize short-file attribution
+        poi = []
+        f['line_count'] = line_count
+
+        def check_regex(pattern, key, flags=0, weight_poi=True):
+            match = re.search(pattern, code, flags)
+            f[key] = bool(match)
+            if match and weight_poi:
+                poi.append(match.group(0).strip())
+            return match
 
         # Structural
-        f['has_main_guard']       = bool(re.search(r'if\s+__name__\s*==\s*["\']__main__["\']', code))
-        f['has_docstring']        = '"""' in code or "'''" in code
-        f['has_exercise_header']  = bool(re.search(r'#\s*(Ejercicio|Tarea|Solución|Exercise|Task|Solution)\s*[:.]', code, re.I))
-        # Only meaningful signal when code is long enough to reasonably expect comments
-        # Reduced from 8 to 4 because even short AI code is often suspiciously comment-free
-        f['no_inline_comments']   = ('#' not in code and '//' not in code) and line_count >= 4
-        f['comment_ratio']        = (code.count('#') + code.count('//')) / max(line_count, 1)
-        f['has_type_hints']       = bool(re.search(r'->\s*\w+|:\s*(int|str|float|list|dict|bool|Optional|List|Dict|Tuple)', code))
-        f['has_optional_hint']    = 'Optional[' in code
-        f['uses_f_strings']       = bool(re.search(r'\bf["\']', code))
-        f['uses_list_comp']       = bool(re.search(r'\[.+\s+for\s+\w+\s+in\s+', code))
-        f['uses_generators']      = 'yield' in code
-        f['uses_dataclass']       = '@dataclass' in code
+        check_regex(r'if\s+__name__\s*==\s*["\']__main__["\']', 'has_main_guard')
+        
+        f['has_docstring'] = '"""' in code or "'''" in code
+        if f['has_docstring']:
+            doc_match = re.search(r'(""".*?"""|\'\'\'.*?\'\'\')', code, re.DOTALL)
+            if doc_match: poi.append(doc_match.group(0).split('\n')[0] + "...")
+
+        check_regex(r'#\s*(Ejercicio|Tarea|Solución|Exercise|Task|Solution)\s*[:.]', 'has_exercise_header', re.I)
+        
+        f['no_inline_comments'] = ('#' not in code and '//' not in code) and line_count >= 4
+        f['comment_ratio'] = (code.count('#') + code.count('//')) / max(line_count, 1)
+        
+        check_regex(r'->\s*\w+|:\s*(int|str|float|list|dict|bool|Optional|List|Dict|Tuple)', 'has_type_hints')
+        if 'Optional[' in code:
+            f['has_optional_hint'] = True
+            poi.append("Optional[...] type hint")
+            
+        check_regex(r'\bf["\']', 'uses_f_strings')
+        check_regex(r'\[.+\s+for\s+\w+\s+in\s+', 'uses_list_comp')
+        
+        if 'yield' in code:
+            f['uses_generators'] = True
+            poi.append("yield (generator)")
+            
+        if '@dataclass' in code:
+            f['uses_dataclass'] = True
+            poi.append("@dataclass usage")
 
         # Condensed style (Gemini)
-        f['is_condensed']         = ';' in code and ('tk.' in code or 'self.' in code)
-        f['has_tk_self']          = 'tk.' in code and 'self.' in code
-        f['short_varnames']       = len(re.findall(r'\b(?:x|n|v|i|j|k|a|b|c|s|t|m|p|q)\b', normalized)) > 5
+        f['is_condensed'] = ';' in code and ('tk.' in code or 'self.' in code)
+        f['has_tk_self'] = 'tk.' in code and 'self.' in code
+        if f['is_condensed']: poi.append("Multiple statements per line with ;")
+
+        f['short_varnames'] = len(re.findall(r'\b(?:x|n|v|i|j|k|a|b|c|s|t|m|p|q)\b', normalized)) > 5
 
         # ChatGPT / verbose patterns
-        f['has_step_comments']    = bool(re.search(r'#\s*Step\s*\d|//\s*Step\s*\d', code, re.I))
-        f['has_section_comments'] = bool(re.search(r'#\s*={3,}|/\*\s*={3,}', code))
-        f['eng_var_names']        = len(re.findall(r'\b(result|output|data|value|response|items|count|total|index|temp)\b', normalized)) >= 3
-        f['has_print_debug']      = 'print(' in code
+        check_regex(r'#\s*Step\s*\d|//\s*Step\s*\d', 'has_step_comments', re.I)
+        check_regex(r'#\s*={3,}|/\*\s*={3,}', 'has_section_comments')
+        
+        eng_vars = re.findall(r'\b(result|output|data|value|response|items|count|total|index|temp)\b', normalized)
+        f['eng_var_names'] = len(eng_vars) >= 3
+        if f['eng_var_names']: poi.append(f"Generic variable names: {', '.join(set(eng_vars[:3]))}")
+
+        if 'print(' in code:
+            f['has_print_debug'] = True
 
         # Claude patterns
-        f['verbose_var_names']    = len(re.findall(r'\b\w{15,}\b', normalized)) >= 3
-        f['has_narrative_comment'] = bool(re.search(r'#.{40,}|//.{40,}', code))
-        f['returns_not_prints']   = 'return ' in code and 'print(' not in code
+        verbose_vars = re.findall(r'\b\w{15,}\b', normalized)
+        f['verbose_var_names'] = len(verbose_vars) >= 3
+        if f['verbose_var_names']: poi.append(f"Verbose variable names: {verbose_vars[0]}...")
+
+        check_regex(r'#.{40,}|//.{40,}', 'has_narrative_comment')
+        f['returns_not_prints'] = 'return ' in code and 'print(' not in code
 
         # Web / Blackbox patterns
-        f['has_viewport']         = '<meta name="viewport"' in code.lower()
-        f['has_markdown_block']   = '```' in code
-        f['has_step_labels']      = bool(re.search(r'//\s*Step\s*\d|<!--\s*Step', code, re.I))
+        check_regex(r'<meta name="viewport"', 'has_viewport', re.I)
+        if '```' in code:
+            f['has_markdown_block'] = True
+            poi.append("Markdown code block delimiter (```)")
+            
+        check_regex(r'//\s*Step\s*\d|<!--\s*Step', 'has_step_labels', re.I)
 
         # JS patterns
         js_patterns = ['.forEach', '.getElementById', 'const ', 'textContent',
                         'addEventListener', 'document.createElement', '.appendChild',
                         'querySelector', 'fetch(', 'async ', 'await ']
-        f['js_pattern_count']     = sum(1 for p in js_patterns if p in code)
-        f['has_react_hooks']      = bool(re.search(r'useState|useEffect|useCallback|useMemo', code))
-        f['generic_fn_names']     = bool(re.search(r'\b(handleClick|handleChange|handleSubmit|foo|bar|baz)\b', code))
+        f['js_pattern_count'] = sum(1 for p in js_patterns if p in code)
+        check_regex(r'useState|useEffect|useCallback|useMemo', 'has_react_hooks')
+        check_regex(r'\b(handleClick|handleChange|handleSubmit|foo|bar|baz)\b', 'generic_fn_names')
 
         # Python patterns
-        f['has_python_logic']     = 'def ' in code and (':' in code or 'print(' in code)
+        f['has_python_logic'] = 'def ' in code and (':' in code or 'print(' in code)
 
         # DeepSeek patterns
-        f['has_numpy_pandas']     = bool(re.search(r'\b(np\.|pd\.|numpy|pandas)\b', code))
-        f['has_cjk']              = bool(re.search(r'[\u4e00-\u9fff\u3400-\u4dbf]', code))
-        # Better dense math: count occurrences of operators or math. calls
-        f['dense_math']           = len(re.findall(r'[\+\-\*\/\%\^]|\bmath\.\w+', code)) >= 3
+        check_regex(r'\b(np\.|pd\.|numpy|pandas)\b', 'has_numpy_pandas')
+        check_regex(r'[\u4e00-\u9fff\u3400-\u4dbf]', 'has_cjk')
+        
+        math_ops = re.findall(r'[\+\-\*\/\%\^]|\bmath\.\w+', code)
+        f['dense_math'] = len(math_ops) >= 3
 
-        # Grok (xAI) patterns — casual, witty, conversational comments
-        f['has_casual_comments']  = bool(re.search(
-            r"#\s*(let's|now let's|here we|basically|note:|important:|alright|okay so|so here)",
-            code, re.I))
-        f['has_assert_stmts']     = 'assert ' in code
-        f['has_usage_example']    = bool(re.search(r'#\s*(example|usage|example usage)\s*[:\-]', code, re.I))
+        # Grok (xAI) patterns
+        check_regex(r"#\s*(let's|now let's|here we|basically|note:|important:|alright|okay so|so here)", 'has_casual_comments', re.I)
+        if 'assert ' in code:
+            f['has_assert_stmts'] = True
+            poi.append("assert statement")
+        check_regex(r'#\s*(example|usage|example usage)\s*[:\-]', 'has_usage_example', re.I)
 
-        # Groq / Llama patterns — systematic, action-verb comments, functional style
-        f['has_todo_comments']    = bool(re.search(r'#\s*(TODO|FIXME|HACK|NOTE)\s*:', code))
-        f['has_process_comments'] = bool(re.search(
-            r'#\s*(Initialize|Process|Return|Compute|Calculate|Validate|Handle|Load|Save|Check|Build)',
-            code, re.I))
-        f['uses_enumerate']       = 'enumerate(' in code
-        f['uses_zip']             = 'zip(' in code
+        # Groq / Llama patterns
+        check_regex(r'#\s*(TODO|FIXME|HACK|NOTE)\s*:', 'has_todo_comments')
+        check_regex(r'#\s*(Initialize|Process|Return|Compute|Calculate|Validate|Handle|Load|Save|Check|Build)', 'has_process_comments', re.I)
+        if 'enumerate(' in code:
+            f['uses_enumerate'] = True
+        if 'zip(' in code:
+            f['uses_zip'] = True
 
-        # Qwen (Alibaba) patterns — CJK comments, very clean type-hinted code
-        f['has_cjk_comment']      = bool(re.search(r'#.*[\u4e00-\u9fff\u3400-\u4dbf]', code))
-        f['uses_result_pattern']  = bool(re.search(r'\bresult\s*=\s*\[\]|\bresult\s*=\s*{}|\bresult\s*=\s*None', code))
+        # Qwen (Alibaba) patterns
+        check_regex(r'#.*[\u4e00-\u9fff\u3400-\u4dbf]', 'has_cjk_comment')
+        check_regex(r'\bresult\s*=\s*\[\]|\bresult\s*=\s*{}|\bresult\s*=\s*None', 'uses_result_pattern')
 
         # Indentation consistency
         if len(indentations) > 5:
             nonzero = [i for i in indentations if i > 0]
             f['perfectly_indented'] = all(i % 2 == 0 for i in nonzero) if nonzero else False
+            if f['perfectly_indented']: poi.append("Perfectly consistent indentation")
         else:
             f['perfectly_indented'] = False
 
@@ -163,13 +200,18 @@ class AIEngine:
             r'const\s+\w+\s+=\s+document\.getElementById\(',
             r'function\s+\w+\(.*\)\s*{\s*return',
         ]
-        f['canonical_count'] = sum(1 for p in canonical if re.search(p, code, re.I))
+        f['canonical_count'] = 0
+        for p in canonical:
+            if check_regex(p, 'canonical_match_internal', re.I):
+                f['canonical_count'] += 1
 
-        # Ghost libraries (dead giveaway)
+        # Ghost libraries
         ghost_libs = ['gpt_helper', 'ai_utils', 'fast_neural', 'ez_ml', 'simple_auth_v2']
         f['ghost_libs'] = [lib for lib in ghost_libs if lib in normalized.lower()]
+        if f['ghost_libs']:
+            poi.extend([f"Suspected fake library: {lib}" for lib in f['ghost_libs']])
 
-        return f
+        return f, list(set(poi))
 
     # ── 3. FINGERPRINT DEFINITIONS ───────────────────────────────────────────
 
@@ -418,7 +460,7 @@ class AIEngine:
         base_score = AIEngine._continuous_base_score(entropy)
 
         # ── Step 2: extract all stylometric features ─────────────────────
-        features = AIEngine._extract_features(code, normalized)
+        features, poi = AIEngine._extract_features(code, normalized)
 
         # ── Step 3: score each brand fingerprint ─────────────────────────
         brand_scores = {}
@@ -547,6 +589,7 @@ class AIEngine:
             "brand_scores":           brand_scores,
             "brand_color":            brand_color,
             "ghost_libraries":        features['ghost_libs'],
+            "points_of_interest":     poi,
         }
 
     @staticmethod
