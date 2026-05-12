@@ -5,6 +5,8 @@ from typing import List, Dict, Any
 from openai import AsyncOpenAI
 import google.generativeai as genai
 from groq import AsyncGroq
+from anthropic import AsyncAnthropic
+import cohere
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -129,6 +131,65 @@ class ArmyService:
             print(f"Error Groq: {e}")
             return None
 
+    @staticmethod
+    async def consult_claude(code: str) -> Dict[str, Any]:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key: return None
+        try:
+            client = AsyncAnthropic(api_key=api_key)
+            prompt = (
+                f"Actúa como analista forense de IA. Analiza este código y determina si fue generado por un modelo de lenguaje.\n"
+                f"CÓDIGO:\n{code}\n\n"
+                f"Responde SOLO con un JSON válido (usa doble comillas):\n"
+                f"{{\n"
+                f"  \"probability\": 90,\n"
+                f"  \"reason\": \"explicación breve\",\n"
+                f"  \"detected_model\": \"Claude-3\",\n"
+                f"  \"evidence\": [\"evidencia 1\", \"...\"],\n"
+                f"  \"points_of_interest\": [\"bloque 1\", \"...\"]\n"
+                f"}}\n"
+            )
+            response = await client.messages.create(
+                model="claude-3-5-sonnet-20240620",
+                max_tokens=1000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            text = response.content[0].text
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            return json.loads(text)
+        except Exception as e:
+            print(f"Error Claude: {e}")
+            return None
+
+    @staticmethod
+    async def consult_cohere(code: str) -> Dict[str, Any]:
+        api_key = os.getenv("COHERE_API_KEY")
+        if not api_key: return None
+        try:
+            co = cohere.AsyncClient(api_key=api_key)
+            prompt = (
+                f"Analiza si este código es generado por IA. Responde solo JSON:\n"
+                f"{{\n"
+                f"  \"probability\": 80,\n"
+                f"  \"reason\": \"resumen\",\n"
+                f"  \"detected_model\": \"Cohere Command\",\n"
+                f"  \"evidence\": [\"...\"],\n"
+                f"  \"points_of_interest\": [\"...\"]\n"
+                f"}}\n\nCÓDIGO:\n{code}"
+            )
+            response = await co.chat(
+                message=prompt,
+                model="command-r-plus"
+            )
+            text = response.text
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            return json.loads(text)
+        except Exception as e:
+            print(f"Error Cohere: {e}")
+            return None
+
     @classmethod
     async def get_consensus(cls, code: str) -> Dict[str, Any]:
         """
@@ -142,6 +203,8 @@ class ArmyService:
         if os.getenv("DEEPSEEK_API_KEY"): tasks.append(cls.consult_deepseek(code))
         if os.getenv("XAI_API_KEY"): tasks.append(cls.consult_xai(code))
         if os.getenv("QWEN_API_KEY"): tasks.append(cls.consult_qwen(code))
+        if os.getenv("ANTHROPIC_API_KEY"): tasks.append(cls.consult_claude(code))
+        if os.getenv("COHERE_API_KEY"): tasks.append(cls.consult_cohere(code))
         
         if not tasks:
             return {"army_score": 0, "army_verdict": "Sin llaves configuradas", "army_details": []}

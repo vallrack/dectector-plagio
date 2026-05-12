@@ -75,7 +75,50 @@ class AIEngine:
         indentations = [len(l) - len(l.lstrip()) for l in code.split('\n') if l.strip()]
         line_count = len(lines)
 
-        f = {}
+        f = {
+            'has_main_guard': False,
+            'has_docstring': False,
+            'has_exercise_header': False,
+            'no_inline_comments': False,
+            'comment_ratio': 0.0,
+            'has_type_hints': False,
+            'has_optional_hint': False,
+            'uses_f_strings': False,
+            'uses_list_comp': False,
+            'uses_generators': False,
+            'uses_dataclass': False,
+            'is_condensed': False,
+            'has_tk_self': False,
+            'short_varnames': False,
+            'has_step_comments': False,
+            'has_section_comments': False,
+            'eng_var_names': False,
+            'has_print_debug': False,
+            'verbose_var_names': False,
+            'has_narrative_comment': False,
+            'returns_not_prints': False,
+            'has_viewport': False,
+            'has_markdown_block': False,
+            'has_step_labels': False,
+            'has_react_hooks': False,
+            'generic_fn_names': False,
+            'has_python_logic': False,
+            'has_numpy_pandas': False,
+            'has_cjk': False,
+            'dense_math': False,
+            'has_casual_comments': False,
+            'has_assert_stmts': False,
+            'has_usage_example': False,
+            'has_todo_comments': False,
+            'has_process_comments': False,
+            'uses_enumerate': False,
+            'uses_zip': False,
+            'has_cjk_comment': False,
+            'uses_result_pattern': False,
+            'perfectly_indented': False,
+            'canonical_count': 0,
+            'ghost_libs': []
+        }
         poi = []
         f['line_count'] = line_count
 
@@ -206,10 +249,11 @@ class AIEngine:
                 f['canonical_count'] += 1
 
         # Ghost libraries
-        ghost_libs = ['gpt_helper', 'ai_utils', 'fast_neural', 'ez_ml', 'simple_auth_v2']
-        f['ghost_libs'] = [lib for lib in ghost_libs if lib in normalized.lower()]
-        if f['ghost_libs']:
-            poi.extend([f"Suspected fake library: {lib}" for lib in f['ghost_libs']])
+        ghost_libs_names = ['gpt_helper', 'ai_utils', 'fast_neural', 'ez_ml', 'simple_auth_v2']
+        found_ghosts = [lib for lib in ghost_libs_names if lib in normalized.lower()]
+        f['ghost_libs'] = found_ghosts
+        if found_ghosts:
+            poi.extend([f"Suspected fake library: {lib}" for lib in found_ghosts])
 
         return f, list(set(poi))
 
