@@ -47,72 +47,70 @@ class FileProcessor:
         """
         Run the heuristic engine + AI Army Consensus + Copyleaks.
         """
+        import logging
+        logger = logging.getLogger("uvicorn.error")
+        
         analysis_engine = "LuminaShield"
+        logger.info("Iniciando análisis heurístico local...")
         analysis = AIEngine.detect_ai_signature(content)
+        logger.info(f"Análisis local terminado. Score: {analysis['score']}")
 
         # 1. Consultar al Ejército de IA (Consenso multi-modelo)
-        army_keys = ["OPENAI_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "DEEPSEEK_API_KEY"]
+        army_keys = ["OPENAI_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY"]
         has_army = any(os.getenv(k) for k in army_keys)
 
         if has_army:
+            logger.info("Consultando al Ejército de IA...")
             army_result = await ArmyService.get_consensus(content)
+            logger.info(f"Resultado del Ejército: Score={army_result['army_score']}, Modelos={len(army_result['army_details'])}")
+            
             if army_result["army_details"]:
-                # Mezclamos el score del ejército con el local (Ponderación 70% Ejército / 30% Local)
+                # Mezclamos el score del ejército con el local
                 local_score = analysis["score"]
                 army_score = army_result["army_score"]
                 
-                # Si el ejército está muy seguro, le damos prioridad
                 if army_score > 80 or army_score < 20:
                     analysis["score"] = army_score
                 else:
                     analysis["score"] = round((army_score * 0.7) + (local_score * 0.3), 2)
                 
-                # Si el ejército detecta plagio, actualizar la atribución de IA
                 if analysis["score"] > 60:
                     best_army_model = max(army_result["army_details"], key=lambda x: x.get("probability", 0))
                     if best_army_model.get("detected_model"):
                         model_name = best_army_model["detected_model"]
                         analysis["detected_model"] = model_name
                         
-                        # Mapeo básico de nombres del ejército a las marcas del AIEngine
                         brand_map = {
-                            "OpenAI": "ChatGPT (OpenAI)",
-                            "DeepSeek": "DeepSeek",
-                            "xAI": "Grok (xAI)",
-                            "Alibaba": "Qwen (Alibaba)",
-                            "Gemini": "Gemini (Google)",
-                            "Llama": "Groq / Llama",
-                            "Groq": "Groq / Llama"
+                            "OpenAI": "ChatGPT (OpenAI)", "DeepSeek": "DeepSeek", "xAI": "Grok (xAI)",
+                            "Alibaba": "Qwen (Alibaba)", "Gemini": "Gemini (Google)", "Llama": "Groq / Llama",
+                            "Groq": "Groq / Llama", "Claude": "Claude (Anthropic)"
                         }
                         
                         analysis["detected_brand"] = next((v for k, v in brand_map.items() if k in model_name), model_name)
                         analysis["brand_color"] = AIEngine.BRAND_COLORS.get(analysis["detected_brand"], "#8B5CF6")
                         analysis["attribution_confidence"] = best_army_model.get("probability", 80)
-                elif analysis["score"] < 40:
-                    analysis["detected_model"] = "No Identificado (Probable Humano)"
-                    analysis["detected_brand"] = None
-                    analysis["brand_color"] = "#22C55E"
-                    analysis["attribution_confidence"] = 0
 
                 analysis["reasoning"] = f"Consenso de IA ({len(army_result['army_details'])} modelos): {army_result['army_verdict']}"
                 analysis["army_details"] = army_result["army_details"]
                 
-                # Extraer puntos de interés de todos los modelos del ejército para destacar en el código
                 poi = analysis.get("points_of_interest", [])
                 for detail in army_result["army_details"]:
                     if detail.get("points_of_interest"):
                         poi.extend(detail["points_of_interest"])
-                analysis["points_of_interest"] = list(set(poi)) # unique y mezclado con heurísticos
+                analysis["points_of_interest"] = list(set(poi))
                 
                 analysis_engine += " + AI Army"
+            else:
+                logger.warning("El Ejército de IA no devolvió resultados válidos.")
 
         # 2. Consultar a Copyleaks si sigue habiendo sospechas
-        if analysis["score"] > 60:
+        if analysis["score"] > 60 and os.getenv("COPYLEAKS_API_KEY"):
+            logger.info("Consultando a Copyleaks...")
             from ..services.copyleaks_service import CopyleaksService
             deep_result = CopyleaksService.analyze_code(content)
 
             if "score" in deep_result:
-                # Copyleaks suele ser el estándar de oro si está disponible
+                logger.info(f"Copyleaks terminado. Score: {deep_result['score']}")
                 analysis["score"] = deep_result["score"]
                 if not analysis.get("reasoning"):
                     analysis["reasoning"] = deep_result.get("reasoning", "")
@@ -121,6 +119,8 @@ class FileProcessor:
                     analysis["detected_model"] = deep_result["detected_model"]
 
                 analysis_engine += " + Copyleaks"
+            else:
+                logger.warning(f"Copyleaks falló: {deep_result.get('error')}")
 
         return analysis, analysis_engine
 

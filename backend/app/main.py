@@ -64,8 +64,15 @@ def health_check():
     import os
     return {
         "status": "ok",
-        "database_url_set": bool(os.getenv("DATABASE_URL")),
+        "database_url_set": bool(os.getenv("DATABASE_URL") or os.getenv("DATABASE_URL_PRIMARY")),
         "secret_key_set": bool(os.getenv("SECRET_KEY")),
+        "ai_keys": {
+            "openai": bool(os.getenv("OPENAI_API_KEY")),
+            "gemini": bool(os.getenv("GEMINI_API_KEY")),
+            "groq": bool(os.getenv("GROQ_API_KEY")),
+            "deepseek": bool(os.getenv("DEEPSEEK_API_KEY")),
+            "anthropic": bool(os.getenv("ANTHROPIC_API_KEY")),
+        }
     }
 
 @app.get("/debug/db")
