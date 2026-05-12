@@ -1,11 +1,14 @@
 import io
 import json
+import logging
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from ..models.database import Project, CodeFile
 from sqlmodel import Session, select
+
+logger = logging.getLogger(__name__)
 
 class ReportService:
     @staticmethod
@@ -20,11 +23,11 @@ class ReportService:
         doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
         styles = getSampleStyleSheet()
         
-        # Estilos personalizados
+        # Estilos personalizados mejorados
         title_style = ParagraphStyle(
             'TitleStyle',
             parent=styles['Heading1'],
-            fontSize=26,
+            fontSize=24,
             spaceAfter=20,
             textColor=colors.HexColor("#1e40af"),
             alignment=1 # Center
@@ -36,8 +39,16 @@ class ReportService:
             fontSize=16,
             spaceBefore=15,
             spaceAfter=10,
-            textColor=colors.HexColor("#3b82f6"),
+            textColor=colors.HexColor("#1e3a8a"),
             borderPadding=5
+        )
+
+        sub_header_style = ParagraphStyle(
+            'SubHeaderStyle',
+            parent=styles['Heading3'],
+            fontSize=12,
+            textColor=colors.HexColor("#2563eb"),
+            spaceBefore=8
         )
 
         evidence_style = ParagraphStyle(
@@ -45,99 +56,126 @@ class ReportService:
             parent=styles['Normal'],
             fontSize=10,
             leftIndent=20,
-            spaceBefore=5,
+            spaceBefore=3,
             textColor=colors.HexColor("#374151")
+        )
+
+        detail_style = ParagraphStyle(
+            'DetailStyle',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor("#4b5563"),
+            italic=True
         )
         
         content = []
         
-        # PORTADA
+        # --- PORTADA ---
         content.append(Spacer(1, 100))
-        content.append(Paragraph(f"REPORTE FORENSE DE IA", title_style))
-        content.append(Paragraph(f"Proyecto: {project.name}", styles['Heading2']))
+        content.append(Paragraph("REPORTE FORENSE DE AUTORÍA IA", title_style))
+        content.append(Spacer(1, 10))
+        content.append(Paragraph(f"PROYECTO: {project.name}", styles['Heading2']))
         content.append(Spacer(1, 20))
-        content.append(Paragraph(f"Este documento contiene un análisis detallado generado por el sistema LuminaShield y su Ejército de IA para identificar trazas de generación por modelos de lenguaje (GPT-4, Claude, Gemini, etc.).", styles['Normal']))
-        content.append(Spacer(1, 200))
+        content.append(Paragraph(
+            "Análisis técnico avanzado de firmas digitales y patrones sintéticos para la detección "
+            "de contenido generado por modelos de lenguaje de gran escala (LLMs).", 
+            styles['Normal']
+        ))
+        content.append(Spacer(1, 250))
+        content.append(Paragraph(f"Generado por LuminaShield AI Engine", detail_style))
+        content.append(PageBreak())
         
-        # Resumen Ejecutivo
+        # --- RESUMEN EJECUTIVO ---
         content.append(Paragraph("Resumen Ejecutivo", header_style))
         summary_data = [
-            ["ID del Proyecto", str(project.id)],
-            ["Fecha de Análisis", project.upload_date.strftime("%Y-%m-%d %H:%M:%S")],
-            ["Archivos Analizados", str(len(files))],
+            ["ID de Proyecto", str(project.id)],
+            ["Fecha de Análisis", project.upload_date.strftime("%d/%m/%Y %H:%M:%S")],
+            ["Archivos Procesados", str(len(files))],
             ["Probabilidad Global de IA", f"{project.overall_score}%"],
             ["Veredicto Final", "SOSPECHA DE IA" if project.overall_score > 60 else "PROBABLE HUMANO"]
         ]
         
         st = Table(summary_data, colWidths=[150, 300])
         st.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#f3f4f6")),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('PADDING', (0, 0), (-1, -1), 8),
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#f8fafc")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ('PADDING', (0, 0), (-1, -1), 10),
             ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('TEXTCOLOR', (1, 4), (1, 4), colors.red if project.overall_score > 60 else colors.green),
         ]))
         content.append(st)
-        content.append(PageBreak())
+        content.append(Spacer(1, 30))
         
-        # DETALLE POR ARCHIVO
-        content.append(Paragraph("Desglose Forense por Archivo", header_style))
+        # --- DETALLE POR ARCHIVO ---
+        content.append(Paragraph("Análisis Detallado por Archivo", header_style))
         
         for f in files:
-            content.append(Paragraph(f"Archivo: {f.filename}", styles['Heading3']))
+            content.append(Paragraph(f"Archivo: {f.filename}", sub_header_style))
             
-            # Tabla básica del archivo
+            # Info básica
             file_info = [
                 ["Métrica", "Valor"],
-                ["Probabilidad de IA", f"{f.ai_score}%"],
-                ["Motor de Análisis", f.analysis_engine or "LuminaShield"],
-                ["Modelo Detectado", f.detected_model or "N/A"]
+                ["Probabilidad IA", f"{f.ai_score}%"],
+                ["Modelo Identificado", f.detected_model or "No Determinado"],
+                ["Motor Principal", f.analysis_engine or "LuminaShield"]
             ]
             
             fit = Table(file_info, colWidths=[150, 300])
             fit.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#3b82f6")),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#1e40af")),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#94a3b8")),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('PADDING', (0, 0), (-1, -1), 6),
             ]))
             content.append(fit)
             content.append(Spacer(1, 10))
             
-            # EVIDENCIAS DETALLADAS
+            # --- EVIDENCIAS FORENSES ---
             if f.ai_analysis:
                 try:
-                    analysis_data = json.loads(f.ai_analysis)
-                    if analysis_data:
-                        content.append(Paragraph("Evidencias de Generación por IA:", styles['Heading4']))
-                        
-                        # Consolidar evidencias de todos los modelos
-                        for result in analysis_data:
-                            model_name = result.get('detected_model', 'Modelo Desconocido')
-                            content.append(Paragraph(f"• Según {model_name}:", styles['Normal']))
+                    data = json.loads(f.ai_analysis)
+                    # El nuevo formato tiene army_details, points_of_interest, evidence
+                    
+                    # 1. Detalles del Ejército (si existen)
+                    army_details = data.get("army_details", [])
+                    if army_details:
+                        content.append(Paragraph("Evidencias del Consenso de IA:", styles['Heading4']))
+                        for detail in army_details:
+                            model_name = detail.get("detected_model", "Analista IA")
+                            prob = detail.get("probability", 0)
+                            content.append(Paragraph(f"• {model_name} (Confianza: {prob}%):", styles['Normal']))
                             
-                            evidences = result.get('evidence', [])
-                            if isinstance(evidences, list):
-                                for ev in evidences:
+                            ev_list = detail.get("evidence", [])
+                            if isinstance(ev_list, list):
+                                for ev in ev_list:
                                     content.append(Paragraph(f"- {ev}", evidence_style))
+                    
+                    # 2. Puntos de Interés Heurísticos
+                    poi = data.get("points_of_interest", [])
+                    if poi:
+                        content.append(Paragraph("Patrones y Estructuras Detectadas:", styles['Heading4']))
+                        for p in poi:
+                            content.append(Paragraph(f"> {p}", evidence_style))
                             
-                            poi = result.get('points_of_interest', [])
-                            if poi and isinstance(poi, list):
-                                content.append(Paragraph("Puntos Críticos:", evidence_style))
-                                for p in poi:
-                                    content.append(Paragraph(f"  > {p}", evidence_style))
-                            
-                            content.append(Spacer(1, 5))
                 except Exception as e:
-                    content.append(Paragraph(f"Error al procesar evidencias: {e}", styles['Italic']))
+                    logger.error(f"Error parsing ai_analysis in PDF: {e}")
+                    content.append(Paragraph("Error al procesar las evidencias técnicas.", detail_style))
             else:
-                content.append(Paragraph("No se encontraron evidencias forenses adicionales para este archivo.", styles['Italic']))
+                content.append(Paragraph("No se encontraron firmas adicionales en este archivo.", detail_style))
             
-            content.append(Spacer(1, 20))
-            content.append(Paragraph("-" * 80, styles['Normal']))
+            content.append(Spacer(1, 15))
+            content.append(Paragraph("-" * 90, detail_style))
+            content.append(Spacer(1, 10))
 
-        # Disclaimer
+        # --- FINAL ---
         content.append(Spacer(1, 40))
-        disclaimer = "IMPORTANTE: Este reporte es una herramienta de apoyo probabilística. Los resultados deben ser validados por un experto humano antes de tomar cualquier medida académica o profesional."
-        content.append(Paragraph(disclaimer, ParagraphStyle('Disc', parent=styles['Normal'], textColor=colors.red, fontSize=9, italic=True)))
+        disclaimer = (
+            "AVISO LEGAL: Este reporte es un análisis probabilístico basado en modelos de inteligencia artificial "
+            "y heurísticas estilométricas. Los resultados deben ser interpretados como una guía técnica y no como "
+            "una prueba absoluta. Se recomienda la revisión manual por un experto humano."
+        )
+        content.append(Paragraph(disclaimer, ParagraphStyle('Disc', parent=styles['Normal'], textColor=colors.HexColor("#991b1b"), fontSize=8, italic=True)))
         
         doc.build(content)
         buffer.seek(0)
