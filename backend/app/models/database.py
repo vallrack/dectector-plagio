@@ -97,6 +97,8 @@ for db_name, db_url in CANDIDATE_DBS:
         ACTIVE_DB_NAME = name
         ACTIVE_DB_URL = url
         DB_STATUS[db_name] = "✅ ACTIVA"
+        # CRÍTICO: Detenerse en la primera base de datos disponible
+        break
     else:
         DB_STATUS[db_name] = "❌ no disponible"
 
