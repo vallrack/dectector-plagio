@@ -82,38 +82,45 @@ CANDIDATE_DBS = [
     ("DATABASE_URL (Legado)", os.getenv("DATABASE_URL")),
 ]
 
+# Reintento de conexión para mayor estabilidad en la nube
+MAX_RETRIES = 3
 engine = None
 ACTIVE_DB_NAME = "Ninguna"
 ACTIVE_DB_URL = None
-DB_STATUS = {}  # Registro del estado de todas las DBs intentadas
+DB_STATUS = {}
 
 for db_name, db_url in CANDIDATE_DBS:
     if not db_url:
         DB_STATUS[db_name] = "no configurada"
         continue
-    eng, name, url = _try_connect(db_name, db_url)
-    if eng:
-        engine = eng
-        ACTIVE_DB_NAME = name
-        ACTIVE_DB_URL = url
-        DB_STATUS[db_name] = "✅ ACTIVA"
-        # CRÍTICO: Detenerse en la primera base de datos disponible
+    
+    for attempt in range(MAX_RETRIES):
+        eng, name, url = _try_connect(db_name, db_url)
+        if eng:
+            engine = eng
+            ACTIVE_DB_NAME = name
+            ACTIVE_DB_URL = url
+            DB_STATUS[db_name] = "✅ ACTIVA"
+            break
+        else:
+            logger.warning(f"Intento {attempt + 1} fallido para {db_name}, reintentando...")
+            import time
+            time.sleep(2)
+            
+    if engine:
         break
     else:
-        DB_STATUS[db_name] = "❌ no disponible"
+        DB_STATUS[db_name] = "❌ no disponible tras reintentos"
 
-# Fallback final: SQLite local
-if engine is None:
-    logger.warning("⚠️ [DB] Todas las bases de datos en la nube fallaron. Usando SQLite de emergencia.")
-    BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    STORAGE_DIR = os.path.join(BASE_DIR, "storage")
-    os.makedirs(STORAGE_DIR, exist_ok=True)
-    sqlite_url = f"sqlite:///{os.path.join(STORAGE_DIR, 'plagiarism_detector.db')}"
+# Fallback final: SQLite (SOLO EN LOCAL, no en Render)
+if engine is None and not os.getenv("RENDER"):
+    logger.warning("⚠️ [DB] Usando SQLite local.")
+    sqlite_url = "sqlite:///./plagiarism_detector.db"
     engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
-    ACTIVE_DB_NAME = "SQLite (Emergencia Local)"
-    ACTIVE_DB_URL = sqlite_url
-    DB_STATUS["SQLite (Emergencia)"] = "✅ ACTIVA (fallback)"
-    logger.info(f"✅ [DB] SQLite de emergencia en: {sqlite_url}")
+    ACTIVE_DB_NAME = "SQLite (Local)"
+    DB_STATUS["SQLite"] = "✅ ACTIVA"
+elif engine is None:
+    logger.error("❌ [DB] ERROR CRÍTICO: No se pudo conectar a ninguna base de datos en la nube.")
 
 logger.info(f"🗄️  [DB] Base de datos activa: {ACTIVE_DB_NAME}")
 

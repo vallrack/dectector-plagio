@@ -132,10 +132,10 @@ class FileProcessor:
     async def process_zip(zip_content: bytes, project_id: int):
         """Decompress a ZIP in memory and analyse every supported file."""
         from ..services.document_extractor import DocumentExtractor
-        from ..models.database import engine
+        from ..models.database import engine, ACTIVE_DB_NAME
         from ..core.logger import add_debug_log
         
-        add_debug_log(f"Iniciando tarea ZIP para proyecto {project_id}")
+        add_debug_log(f"Iniciando tarea ZIP para proyecto {project_id} en {ACTIVE_DB_NAME}")
         
         # 1. Analizar todo en memoria primero (para no mantener la DB abierta)
         results_to_save = []
