@@ -5,16 +5,12 @@ sqlmodel
 python-multipart
 scikit-learn
 numpy
-transformers
-torch
 pydantic-settings
 python-jose[cryptography]
 passlib[bcrypt]
 aiofiles
 reportlab
-python-magic
 python-dotenv
-copyleaks
 PyMuPDF
 python-docx
 openpyxl
