@@ -56,13 +56,16 @@ class DocumentExtractor:
         if ext in ignored_extensions:
             return None
 
-        # Para cualquier otro archivo (asumimos que es código o texto plano, ej: .py, .java, .txt, .sql, o lenguajes raros)
-        try:
-            return content_bytes.decode('utf-8')
-        except UnicodeDecodeError:
-            # Si falla la decodificación, probablemente sea un binario no reconocido, lo ignoramos.
-            logger.warning(f"No se pudo decodificar el archivo {filename} como utf-8.")
-            return None
+        # Para cualquier otro archivo (asumimos que es código o texto plano)
+        encodings = ['utf-8', 'latin-1', 'cp1252']
+        for encoding in encodings:
+            try:
+                return content_bytes.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        
+        logger.warning(f"No se pudo decodificar el archivo {filename} con ninguna codificación conocida.")
+        return None
 
     @staticmethod
     def _extract_pdf(content_bytes: bytes) -> str:

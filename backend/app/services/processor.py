@@ -128,6 +128,7 @@ class FileProcessor:
         return analysis, analysis_engine
 
     # ── process_zip ──────────────────────────────────────────────────────────
+    # ── process_zip ──────────────────────────────────────────────────────────
     @staticmethod
     async def process_zip(zip_content: bytes, project_id: int):
         """Decompress a ZIP in memory and analyse every supported file."""
@@ -137,17 +138,18 @@ class FileProcessor:
         
         add_debug_log(f"Iniciando tarea ZIP para proyecto {project_id} en {ACTIVE_DB_NAME}")
         
-        # 1. Analizar todo en memoria primero (para no mantener la DB abierta)
-        results_to_save = []
         try:
             with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
                 files_in_zip = z.namelist()
-                add_debug_log(f"Analizando {len(files_in_zip)} entradas en memoria...")
+                add_debug_log(f"ZIP detectado con {len(files_in_zip)} entradas.")
                 
+                processed = 0
                 for filename in files_in_zip:
+                    # Ignorar basura
                     if filename.startswith("__MACOSX/") or "/." in filename or filename.endswith("/"):
                         continue
 
+                    # Extraer y decodificar
                     with z.open(filename) as f:
                         content_bytes = f.read()
 
@@ -157,49 +159,35 @@ class FileProcessor:
 
                     ext = filename.split(".")[-1].lower() if "." in filename else "txt"
                     
-                    # Llamada a IA (esto es lo que tarda)
+                    # 1. Analizar (Llamada a IA)
+                    add_debug_log(f"Analizando: {filename}...")
                     analysis, analysis_engine = await FileProcessor._run_analysis(content)
                     
-                    results_to_save.append({
-                        "filename": filename,
-                        "ext": ext,
-                        "content": content,
-                        "analysis": analysis,
-                        "analysis_engine": analysis_engine
-                    })
-                    add_debug_log(f"Analizado en memoria: {filename}")
+                    # 2. Guardar inmediatamente (para liberar memoria)
+                    # Usamos una sesión nueva para cada archivo para evitar timeouts largos
+                    with Session(engine) as session:
+                        code_file = FileProcessor._build_code_file(
+                            filename, ext, content, project_id, analysis, analysis_engine
+                        )
+                        session.add(code_file)
+                        session.commit()
+                        processed += 1
+                        add_debug_log(f"Guardado OK: {filename} (Score: {analysis['score']})")
 
-            add_debug_log(f"Análisis completo. Guardando {len(results_to_save)} archivos en DB...")
-
-            # 2. Guardar todo en una transacción rápida
+            # 3. Finalizar proyecto
             with Session(engine) as session:
                 project = session.get(Project, project_id)
-                if not project:
-                    add_debug_log(f"ERROR: Proyecto {project_id} no encontrado.")
-                    return
-
-                for res in results_to_save:
-                    code_file = FileProcessor._build_code_file(
-                        res["filename"], res["ext"], res["content"], 
-                        project_id, res["analysis"], res["analysis_engine"]
-                    )
-                    session.add(code_file)
-                
-                session.commit()
-                add_debug_log(f"Guardado exitoso en DB.")
-
-                # Actualizar resumen
-                session.refresh(project)
-                files = session.exec(select(CodeFile).where(CodeFile.project_id == project_id)).all()
-                if files:
-                    avg_score = sum(f.ai_score for f in files) / len(files)
-                    project.overall_score = round(avg_score, 2)
-                    project.files_count = len(files)
-                
-                project.status = "completed"
-                session.add(project)
-                session.commit()
-                add_debug_log(f"Tarea finalizada. Proyecto {project_id} marcado como COMPLETADO.")
+                if project:
+                    files = session.exec(select(CodeFile).where(CodeFile.project_id == project_id)).all()
+                    if files:
+                        avg_score = sum(f.ai_score for f in files) / len(files)
+                        project.overall_score = round(avg_score, 2)
+                        project.files_count = len(files)
+                    
+                    project.status = "completed"
+                    session.add(project)
+                    session.commit()
+                    add_debug_log(f"PROYECTO FINALIZADO: {processed} archivos procesados.")
 
         except Exception as e:
             import traceback
