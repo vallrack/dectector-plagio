@@ -1,9 +1,16 @@
 import os
-from sqlmodel import SQLModel, Field, create_engine, Session, Relationship
-from typing import List, Optional
+import logging
+from sqlmodel import SQLModel, Field, create_engine, Session
+from sqlalchemy import text
+from sqlalchemy.pool import NullPool
+from typing import Optional
 from datetime import datetime
 
-# Modelos
+logger = logging.getLogger(__name__)
+
+# ==============================================================================
+# MODELOS
+# ==============================================================================
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
@@ -34,46 +41,98 @@ class CodeFile(SQLModel, table=True):
     attribution_confidence: float = 0.0
     brand_color: Optional[str] = None
     analysis_engine: Optional[str] = "LuminaShield"
-    ai_analysis: Optional[str] = None # Almacena JSON con evidencias detalladas
+    ai_analysis: Optional[str] = None
 
-# Configuracion de Motor Dinamico
-DATABASE_URL = os.getenv("DATABASE_URL")
+# ==============================================================================
+# SISTEMA DE FALLBACK EN CASCADA
+# Orden de prioridad: Neon → Supabase → SQLite
+# ==============================================================================
 
-if DATABASE_URL:
-    # Si hay DATABASE_URL (Supabase, Heroku, etc.)
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    
-    # Configuración optimizada para Supabase Connection Pooler (puerto 6543)
-    # El pooler no admite pool_size grande - usar NullPool para serverless/contenedores
-    from sqlalchemy.pool import NullPool
-    engine = create_engine(
-        DATABASE_URL,
-        poolclass=NullPool,  # Cada request obtiene su propia conexión - óptimo para pooler externo
-        connect_args={
-            "connect_timeout": 10,
-            "application_name": "LuminaShield_Backend",
-            "sslmode": "require",  # Supabase requiere SSL
-        }
-    )
-else:
-    # Local (SQLite)
+def _normalize_url(url: str) -> str:
+    """Normaliza URLs postgres:// a postgresql://"""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql://", 1)
+    return url
+
+def _try_connect(name: str, url: str):
+    """Intenta conectarse a una base de datos y verifica la conexión."""
+    try:
+        normalized = _normalize_url(url)
+        eng = create_engine(
+            normalized,
+            poolclass=NullPool,  # Óptimo para poolers externos y serverless
+            connect_args={
+                "connect_timeout": 8,
+                "sslmode": "require",
+            }
+        )
+        # Prueba real de conectividad
+        with eng.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info(f"✅ [DB] Conectado exitosamente a: {name}")
+        return eng, name, normalized
+    except Exception as e:
+        logger.warning(f"⚠️ [DB] {name} no disponible: {type(e).__name__}: {e}")
+        return None, name, None
+
+# Candidatos en orden de prioridad
+CANDIDATE_DBS = [
+    ("Neon (Primaria)", os.getenv("DATABASE_URL_PRIMARY")),
+    ("Supabase (Secundaria)", os.getenv("DATABASE_URL_SECONDARY")),
+    ("DATABASE_URL (Legado)", os.getenv("DATABASE_URL")),
+]
+
+engine = None
+ACTIVE_DB_NAME = "Ninguna"
+ACTIVE_DB_URL = None
+DB_STATUS = {}  # Registro del estado de todas las DBs intentadas
+
+for db_name, db_url in CANDIDATE_DBS:
+    if not db_url:
+        DB_STATUS[db_name] = "no configurada"
+        continue
+    eng, name, url = _try_connect(db_name, db_url)
+    if eng:
+        engine = eng
+        ACTIVE_DB_NAME = name
+        ACTIVE_DB_URL = url
+        DB_STATUS[db_name] = "✅ ACTIVA"
+    else:
+        DB_STATUS[db_name] = "❌ no disponible"
+
+# Fallback final: SQLite local
+if engine is None:
+    logger.warning("⚠️ [DB] Todas las bases de datos en la nube fallaron. Usando SQLite de emergencia.")
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     STORAGE_DIR = os.path.join(BASE_DIR, "storage")
-    
-    if not os.path.exists(STORAGE_DIR):
-        os.makedirs(STORAGE_DIR, exist_ok=True)
-        
+    os.makedirs(STORAGE_DIR, exist_ok=True)
     sqlite_url = f"sqlite:///{os.path.join(STORAGE_DIR, 'plagiarism_detector.db')}"
     engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
+    ACTIVE_DB_NAME = "SQLite (Emergencia Local)"
+    ACTIVE_DB_URL = sqlite_url
+    DB_STATUS["SQLite (Emergencia)"] = "✅ ACTIVA (fallback)"
+    logger.info(f"✅ [DB] SQLite de emergencia en: {sqlite_url}")
+
+logger.info(f"🗄️  [DB] Base de datos activa: {ACTIVE_DB_NAME}")
+
+# ==============================================================================
+# FUNCIONES DE BASE DE DATOS
+# ==============================================================================
 
 def create_db_and_tables():
     try:
         SQLModel.metadata.create_all(engine)
-        print("INFO: Base de datos y tablas verificadas/creadas con éxito.")
+        logger.info(f"✅ [DB] Tablas verificadas/creadas en: {ACTIVE_DB_NAME}")
     except Exception as e:
-        print(f"ERROR CRÍTICO al inicializar base de datos: {e}")
+        logger.error(f"❌ [DB] Error al crear tablas: {e}")
 
 def get_session():
     with Session(engine) as session:
         yield session
+
+def get_db_status() -> dict:
+    """Retorna el estado de todas las bases de datos configuradas."""
+    return {
+        "active_db": ACTIVE_DB_NAME,
+        "databases": DB_STATUS,
+    }

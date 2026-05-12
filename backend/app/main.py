@@ -70,15 +70,17 @@ def health_check():
 
 @app.get("/debug/db")
 def debug_db():
-    """Endpoint de diagnóstico para verificar la conexión a la base de datos."""
+    """Endpoint de diagnóstico: muestra el estado de todas las bases de datos."""
+    from .models.database import get_db_status
     try:
-        from .models.database import engine
-        from sqlalchemy import text
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return {"status": "DB connection OK", "engine": str(engine.url).split('@')[-1]}
+        status = get_db_status()
+        return {
+            "status": "ok",
+            "active_database": status["active_db"],
+            "all_databases": status["databases"],
+        }
     except Exception as e:
-        return {"status": "DB connection FAILED", "error": str(e)}
+        return {"status": "error", "error": str(e)}
 
 @app.get("/projects")
 def get_user_projects(
