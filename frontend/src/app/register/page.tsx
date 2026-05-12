@@ -43,7 +43,15 @@ export default function RegisterPage() {
       await api.post('/auth/register', { email, password });
       router.push('/login?registered=true');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Error al registrarse');
+      console.error("Registration error:", err);
+      const detail = err.response?.data?.detail;
+      const type = err.response?.data?.type;
+      
+      if (detail) {
+        setError(`${detail}${type ? ` (${type})` : ''}`);
+      } else {
+        setError('Error al registrarse. Por favor, verifica la consola o los logs del servidor.');
+      }
     } finally {
       setIsLoading(false);
     }

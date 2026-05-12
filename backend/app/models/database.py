@@ -41,17 +41,28 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
     # Si hay DATABASE_URL (Vercel/Heroku/Supabase)
-    # Correccion para URLs de Heroku/Postgres que usan 'postgres://' en vez de 'postgresql://'
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    # pool_pre_ping ayuda a reconectar si Supabase cierra la conexión por inactividad
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=20, max_overflow=0)
+    
+    # Parametros adicionales para estabilidad en la nube
+    connect_args = {
+        "connect_timeout": 10,
+        "application_name": "LuminaShield_Backend"
+    }
+    
+    # pool_pre_ping ayuda a reconectar si la conexión se pierde
+    engine = create_engine(
+        DATABASE_URL, 
+        pool_pre_ping=True, 
+        pool_size=10, 
+        max_overflow=20,
+        connect_args=connect_args
+    )
 else:
     # Local (SQLite)
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     STORAGE_DIR = os.path.join(BASE_DIR, "storage")
     
-    # Asegurar que el directorio de almacenamiento existe
     if not os.path.exists(STORAGE_DIR):
         os.makedirs(STORAGE_DIR, exist_ok=True)
         
@@ -59,7 +70,13 @@ else:
     engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
 def create_db_and_tables():
-    SQLModel.metadata.create_all(engine)
+    try:
+        SQLModel.metadata.create_all(engine)
+        print("INFO: Base de datos y tablas verificadas/creadas con éxito.")
+    except Exception as e:
+        print(f"ERROR CRÍTICO al inicializar base de datos: {e}")
+        # No relanzamos para permitir que la app intente arrancar, 
+        # pero las peticiones fallarán con el error real en los logs.
 
 def get_session():
     with Session(engine) as session:
