@@ -15,10 +15,11 @@ app = FastAPI(title="Detector de Plagio e IA API")
 app.include_router(auth.router)
 
 # Configuración de CORS dinámica
+# NOTA: allow_credentials=True NO es compatible con allow_origins=['*']
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Permitir todos para facilitar despliegue inicial, ajustar luego
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -57,6 +58,27 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/")
 def read_root():
     return {"message": "AI Plagiarism Detector Backend is running"}
+
+@app.get("/health")
+def health_check():
+    import os
+    return {
+        "status": "ok",
+        "database_url_set": bool(os.getenv("DATABASE_URL")),
+        "secret_key_set": bool(os.getenv("SECRET_KEY")),
+    }
+
+@app.get("/debug/db")
+def debug_db():
+    """Endpoint de diagnóstico para verificar la conexión a la base de datos."""
+    try:
+        from .models.database import engine
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "DB connection OK", "engine": str(engine.url).split('@')[-1]}
+    except Exception as e:
+        return {"status": "DB connection FAILED", "error": str(e)}
 
 @app.get("/projects")
 def get_user_projects(
