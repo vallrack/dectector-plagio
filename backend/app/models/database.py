@@ -40,23 +40,21 @@ class CodeFile(SQLModel, table=True):
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
-    # Si hay DATABASE_URL (Vercel/Heroku/Supabase)
+    # Si hay DATABASE_URL (Supabase, Heroku, etc.)
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     
-    # Parametros adicionales para estabilidad en la nube
-    connect_args = {
-        "connect_timeout": 10,
-        "application_name": "LuminaShield_Backend"
-    }
-    
-    # pool_pre_ping ayuda a reconectar si la conexión se pierde
+    # Configuración optimizada para Supabase Connection Pooler (puerto 6543)
+    # El pooler no admite pool_size grande - usar NullPool para serverless/contenedores
+    from sqlalchemy.pool import NullPool
     engine = create_engine(
-        DATABASE_URL, 
-        pool_pre_ping=True, 
-        pool_size=10, 
-        max_overflow=20,
-        connect_args=connect_args
+        DATABASE_URL,
+        poolclass=NullPool,  # Cada request obtiene su propia conexión - óptimo para pooler externo
+        connect_args={
+            "connect_timeout": 10,
+            "application_name": "LuminaShield_Backend",
+            "sslmode": "require",  # Supabase requiere SSL
+        }
     )
 else:
     # Local (SQLite)
@@ -75,8 +73,6 @@ def create_db_and_tables():
         print("INFO: Base de datos y tablas verificadas/creadas con éxito.")
     except Exception as e:
         print(f"ERROR CRÍTICO al inicializar base de datos: {e}")
-        # No relanzamos para permitir que la app intente arrancar, 
-        # pero las peticiones fallarán con el error real en los logs.
 
 def get_session():
     with Session(engine) as session:
