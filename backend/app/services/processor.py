@@ -136,79 +136,81 @@ class FileProcessor:
         from ..core.logger import add_debug_log
         
         add_debug_log(f"Iniciando tarea ZIP para proyecto {project_id}")
+        
+        # 1. Analizar todo en memoria primero (para no mantener la DB abierta)
+        results_to_save = []
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
+                files_in_zip = z.namelist()
+                add_debug_log(f"Analizando {len(files_in_zip)} entradas en memoria...")
+                
+                for filename in files_in_zip:
+                    if filename.startswith("__MACOSX/") or "/." in filename or filename.endswith("/"):
+                        continue
 
-        with Session(engine) as session:
-            project = session.get(Project, project_id)
-            if not project:
-                add_debug_log(f"ERROR: Proyecto {project_id} no encontrado en DB.")
-                return
+                    with z.open(filename) as f:
+                        content_bytes = f.read()
 
-            try:
-                add_debug_log(f"Abriendo buffer ZIP para {project.name}")
-                with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
-                    processed = 0
-                    files_in_zip = z.namelist()
-                    add_debug_log(f"ZIP abierto. Contiene {len(files_in_zip)} entradas.")
+                    content = DocumentExtractor.extract_text(filename, content_bytes)
+                    if not content or len(content.strip()) < 10:
+                        continue
+
+                    ext = filename.split(".")[-1].lower() if "." in filename else "txt"
                     
-                    for filename in files_in_zip:
-                        if (
-                            filename.startswith("__MACOSX/")
-                            or "/." in filename
-                            or filename.endswith("/")
-                        ):
-                            continue
+                    # Llamada a IA (esto es lo que tarda)
+                    analysis, analysis_engine = await FileProcessor._run_analysis(content)
+                    
+                    results_to_save.append({
+                        "filename": filename,
+                        "ext": ext,
+                        "content": content,
+                        "analysis": analysis,
+                        "analysis_engine": analysis_engine
+                    })
+                    add_debug_log(f"Analizado en memoria: {filename}")
 
-                        add_debug_log(f"Leyendo: {filename}")
-                        with z.open(filename) as f:
-                            content_bytes = f.read()
+            add_debug_log(f"Análisis completo. Guardando {len(results_to_save)} archivos en DB...")
 
-                        content = DocumentExtractor.extract_text(filename, content_bytes)
-                        if not content or len(content.strip()) < 10:
-                            add_debug_log(f"Omitido: {filename} (vacío o no legible)")
-                            continue
+            # 2. Guardar todo en una transacción rápida
+            with Session(engine) as session:
+                project = session.get(Project, project_id)
+                if not project:
+                    add_debug_log(f"ERROR: Proyecto {project_id} no encontrado.")
+                    return
 
-                        ext = filename.split(".")[-1].lower() if "." in filename else "txt"
-
-                        add_debug_log(f"Analizando: {filename}...")
-                        analysis, analysis_engine = await FileProcessor._run_analysis(content)
-
-                        code_file = FileProcessor._build_code_file(
-                            filename, ext, content, project_id, analysis, analysis_engine
-                        )
-                        session.add(code_file)
-                        processed += 1
-                        add_debug_log(f"OK: {filename} (Score: {analysis['score']})")
-
-                    add_debug_log(f"Guardando {processed} archivos en DB...")
-                    session.commit()
-                    add_debug_log(f"Commit exitoso para proyecto {project_id}")
+                for res in results_to_save:
+                    code_file = FileProcessor._build_code_file(
+                        res["filename"], res["ext"], res["content"], 
+                        project_id, res["analysis"], res["analysis_engine"]
+                    )
+                    session.add(code_file)
+                
+                session.commit()
+                add_debug_log(f"Guardado exitoso en DB.")
 
                 # Actualizar resumen
                 session.refresh(project)
-                files = session.exec(
-                    select(CodeFile).where(CodeFile.project_id == project_id)
-                ).all()
-
+                files = session.exec(select(CodeFile).where(CodeFile.project_id == project_id)).all()
                 if files:
                     avg_score = sum(f.ai_score for f in files) / len(files)
                     project.overall_score = round(avg_score, 2)
                     project.files_count = len(files)
-                    project.status = "completed"
-                else:
-                    add_debug_log("ALERTA: Procesamiento terminado pero 0 archivos válidos encontrados.")
-                    project.status = "completed" if processed == 0 else "error"
                 
+                project.status = "completed"
                 session.add(project)
                 session.commit()
-                add_debug_log(f"Tarea ZIP finalizada con éxito. Status: {project.status}")
+                add_debug_log(f"Tarea finalizada. Proyecto {project_id} marcado como COMPLETADO.")
 
-            except Exception as e:
-                import traceback
-                error_trace = traceback.format_exc()
-                add_debug_log(f"CRASH en process_zip: {str(e)}\n{error_trace}")
-                project.status = "error"
-                session.add(project)
-                session.commit()
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            add_debug_log(f"CRASH en process_zip: {str(e)}\n{error_trace}")
+            with Session(engine) as session:
+                project = session.get(Project, project_id)
+                if project:
+                    project.status = "error"
+                    session.add(project)
+                    session.commit()
 
     # ── process_rar ──────────────────────────────────────────────────────────
     @staticmethod
