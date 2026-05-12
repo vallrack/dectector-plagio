@@ -69,10 +69,13 @@ class FileProcessor:
                 local_score = analysis["score"]
                 army_score = army_result["army_score"]
                 
-                if army_score > 80 or army_score < 20:
-                    analysis["score"] = army_score
+                # Ponderación agresiva: Si el ejército está muy seguro (>70%) o el local está seguro, 
+                # tomamos el score más alto en lugar de promediar hacia abajo.
+                if army_score > 70 or local_score > 70:
+                    analysis["score"] = max(army_score, local_score)
                 else:
-                    analysis["score"] = round((army_score * 0.7) + (local_score * 0.3), 2)
+                    # Si ambos son bajos, promediamos pero con peso al ejército
+                    analysis["score"] = round((army_score * 0.8) + (local_score * 0.2), 2)
                 
                 if analysis["score"] > 60:
                     best_army_model = max(army_result["army_details"], key=lambda x: x.get("probability", 0))

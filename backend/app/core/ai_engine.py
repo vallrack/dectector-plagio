@@ -545,56 +545,22 @@ class AIEngine:
             final_score = max(final_score, min(final_score + 8, 99))
 
         # Hard-signal boosters: specific patterns that are unmistakable AI signals
-        # Blackbox — Step labels + viewport = almost certain Blackbox
         if features.get('has_step_labels') and features.get('has_viewport'):
-            final_score = max(final_score, 82)
-            attribution_confidence = max(attribution_confidence, 72)
+            final_score = max(final_score, 85)
+            attribution_confidence = max(attribution_confidence, 75)
 
-        # DeepSeek — numpy + dense math is a very strong signal
         if features.get('has_numpy_pandas') and features.get('dense_math'):
-            final_score = max(final_score, 76)
-            attribution_confidence = max(attribution_confidence, 55)
+            final_score = max(final_score, 80)
+            attribution_confidence = max(attribution_confidence, 60)
 
-        # Groq/Llama — systematic action-verb comments + enumerate
-        if features.get('has_process_comments') and features.get('uses_enumerate'):
-            final_score = max(final_score, 72)
-            attribution_confidence = max(attribution_confidence, 58)
-
-        # Grok — casual comments + assert is distinctive
-        if features.get('has_casual_comments') and features.get('has_assert_stmts'):
-            final_score = max(final_score, 76)
+        # Claude-specific Booster (High quality structure)
+        if features.get('has_type_hints') and features.get('has_narrative_comment') and features.get('returns_not_prints'):
+            final_score = max(final_score, 75)
             attribution_confidence = max(attribution_confidence, 65)
 
-        # Very short files (< 5 lines) cannot be reliably attributed to any brand
-        if features.get('line_count', 99) < 5:
-            final_score = min(final_score, 50)
-            attribution_confidence = 0
-
-        # If code shows almost no AI signals at all, cap the score
-        # Expanded list to be more sensitive to concise AI code
-        ai_signal_count = sum([
-            features['has_docstring'],
-            features['perfectly_indented'],
-            features['uses_f_strings'],
-            features['has_type_hints'],
-            features['no_inline_comments'],
-            features['is_condensed'],
-            features['has_main_guard'],
-            features.get('has_step_labels', False),
-            features.get('has_numpy_pandas', False),
-            features.get('has_process_comments', False),
-            features.get('has_casual_comments', False),
-            features.get('uses_list_comp', False),
-            features.get('has_python_logic', False),
-            features.get('has_tk_self', False),
-        ])
+        # REMOVED: Safety caps that were lowering scores for clean/well-written code.
+        # If the entropy or patterns suggest AI, we trust the signal.
         
-        # Only cap if it's truly devoid of structural AI patterns
-        if ai_signal_count <= 0 and final_score > 50:
-            final_score = min(final_score, 52)
-        elif ai_signal_count == 1 and final_score > 60:
-            final_score = min(final_score, 58)
-
         final_score = round(final_score, 2)
 
         # ── Step 8: build human-readable model name ───────────────────────
