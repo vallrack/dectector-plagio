@@ -24,6 +24,16 @@ except ImportError:
 import google.generativeai as genai
 import os
 
+try:
+    from pptx import Presentation
+except ImportError:
+    Presentation = None
+
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
+
 logger = logging.getLogger(__name__)
 
 class DocumentExtractor:
@@ -47,7 +57,9 @@ class DocumentExtractor:
         elif ext in ['docx', 'doc']:
             return DocumentExtractor._extract_docx(content_bytes)
         elif ext in ['xlsx', 'xls']:
-            return DocumentExtractor._extract_xlsx(content_bytes)
+            return DocumentExtractor._extract_xlsx(content_bytes) if ext == 'xlsx' else DocumentExtractor._extract_xls(content_bytes)
+        elif ext in ['pptx', 'ppt']:
+            return DocumentExtractor._extract_pptx(content_bytes)
         elif ext in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
             return DocumentExtractor._extract_image(content_bytes)
         
@@ -118,6 +130,42 @@ class DocumentExtractor:
             return "\n".join(text_lines)
         except Exception as e:
             logger.error(f"Error extrayendo texto de XLSX: {e}")
+            return None
+
+    @staticmethod
+    def _extract_pptx(content_bytes: bytes) -> str:
+        if not Presentation:
+            logger.error("python-pptx no está instalado.")
+            return None
+        try:
+            prs = Presentation(io.BytesIO(content_bytes))
+            text_runs = []
+            for slide in prs.slides:
+                for shape in slide.shapes:
+                    if hasattr(shape, "text"):
+                        text_runs.append(shape.text)
+            return "\n".join(text_runs).strip()
+        except Exception as e:
+            logger.error(f"Error extrayendo texto de PPTX: {e}")
+            return None
+
+    @staticmethod
+    def _extract_xls(content_bytes: bytes) -> str:
+        if not xlrd:
+            logger.error("xlrd no está instalado.")
+            return None
+        try:
+            workbook = xlrd.open_workbook(file_contents=content_bytes)
+            text_lines = []
+            for sheet in workbook.sheets():
+                for row_idx in range(sheet.nrows):
+                    row = sheet.row_values(row_idx)
+                    row_text = " ".join([str(cell) for cell in row if cell is not None])
+                    if row_text.strip():
+                        text_lines.append(row_text)
+            return "\n".join(text_lines)
+        except Exception as e:
+            logger.error(f"Error extrayendo texto de XLS: {e}")
             return None
 
     @staticmethod

@@ -25,3 +25,5 @@ google-generativeai
 groq
 anthropic
 cohere
+python-pptx
+xlrd

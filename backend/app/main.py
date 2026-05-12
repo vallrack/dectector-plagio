@@ -128,7 +128,8 @@ async def upload_project(
 ):
     allowed_extensions = {
         '.zip', '.rar', '.py', '.js', '.ts', '.tsx', '.java', '.cpp', '.c', '.html', '.css',
-        '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md', '.json', '.csv', '.xml', '.yaml', '.yml', '.php', '.rb', '.go', '.rs', '.sql'
+        '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md', '.json', '.csv', '.xml', '.yaml', '.yml', '.php', '.rb', '.go', '.rs', '.sql',
+        '.pptx', '.ppt'
     }
     ext = '.' + file.filename.split('.')[-1].lower() if '.' in file.filename else ''
     
