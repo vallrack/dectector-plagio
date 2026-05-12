@@ -9,7 +9,8 @@ from datetime import datetime
 from .api import auth
 from .core.auth import get_current_user, User
 
-app = FastAPI(title="Detector de Plagio e IA API")
+from .core.logger import DEBUG_LOGS, add_debug_log
+app = FastAPI(title="LuminaShield API")
 
 # Incluir rutas de autenticación
 app.include_router(auth.router)
@@ -74,6 +75,10 @@ def health_check():
             "anthropic": bool(os.getenv("ANTHROPIC_API_KEY")),
         }
     }
+
+@app.get("/debug/logs")
+def get_debug_logs():
+    return {"logs": DEBUG_LOGS}
 
 @app.get("/debug/db")
 def debug_db():

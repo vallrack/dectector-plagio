@@ -133,21 +133,24 @@ class FileProcessor:
         """Decompress a ZIP in memory and analyse every supported file."""
         from ..services.document_extractor import DocumentExtractor
         from ..models.database import engine
-        import logging
-        logger = logging.getLogger("uvicorn.error")
+        from ..core.logger import add_debug_log
+        
+        add_debug_log(f"Iniciando tarea ZIP para proyecto {project_id}")
 
         with Session(engine) as session:
             project = session.get(Project, project_id)
             if not project:
-                logger.error(f"Proyecto {project_id} no encontrado.")
+                add_debug_log(f"ERROR: Proyecto {project_id} no encontrado en DB.")
                 return
 
             try:
-                logger.info(f"Procesando ZIP para proyecto {project_id} ({project.name})")
+                add_debug_log(f"Abriendo buffer ZIP para {project.name}")
                 with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
                     processed = 0
-                    for filename in z.namelist():
-                        # Ignorar carpetas y archivos ocultos/sistema
+                    files_in_zip = z.namelist()
+                    add_debug_log(f"ZIP abierto. Contiene {len(files_in_zip)} entradas.")
+                    
+                    for filename in files_in_zip:
                         if (
                             filename.startswith("__MACOSX/")
                             or "/." in filename
@@ -155,18 +158,18 @@ class FileProcessor:
                         ):
                             continue
 
-                        logger.info(f"Analizando archivo del ZIP: {filename}")
+                        add_debug_log(f"Leyendo: {filename}")
                         with z.open(filename) as f:
                             content_bytes = f.read()
 
                         content = DocumentExtractor.extract_text(filename, content_bytes)
                         if not content or len(content.strip()) < 10:
-                            logger.warning(f"Archivo {filename} omitido (vacío o no legible)")
+                            add_debug_log(f"Omitido: {filename} (vacío o no legible)")
                             continue
 
                         ext = filename.split(".")[-1].lower() if "." in filename else "txt"
 
-                        # Análisis
+                        add_debug_log(f"Analizando: {filename}...")
                         analysis, analysis_engine = await FileProcessor._run_analysis(content)
 
                         code_file = FileProcessor._build_code_file(
@@ -174,12 +177,13 @@ class FileProcessor:
                         )
                         session.add(code_file)
                         processed += 1
-                        logger.info(f"Archivo {filename} procesado con éxito. Score: {analysis['score']}")
+                        add_debug_log(f"OK: {filename} (Score: {analysis['score']})")
 
+                    add_debug_log(f"Guardando {processed} archivos en DB...")
                     session.commit()
-                    logger.info(f"Commit final del ZIP completado. Total archivos: {processed}")
+                    add_debug_log(f"Commit exitoso para proyecto {project_id}")
 
-                # Actualizar resumen del proyecto
+                # Actualizar resumen
                 session.refresh(project)
                 files = session.exec(
                     select(CodeFile).where(CodeFile.project_id == project_id)
@@ -191,14 +195,17 @@ class FileProcessor:
                     project.files_count = len(files)
                     project.status = "completed"
                 else:
-                    logger.warning("No se encontraron archivos válidos en el ZIP")
+                    add_debug_log("ALERTA: Procesamiento terminado pero 0 archivos válidos encontrados.")
                     project.status = "completed" if processed == 0 else "error"
                 
                 session.add(project)
                 session.commit()
+                add_debug_log(f"Tarea ZIP finalizada con éxito. Status: {project.status}")
 
             except Exception as e:
-                logger.error(f"Error crítico procesando ZIP {project_id}: {str(e)}")
+                import traceback
+                error_trace = traceback.format_exc()
+                add_debug_log(f"CRASH en process_zip: {str(e)}\n{error_trace}")
                 project.status = "error"
                 session.add(project)
                 session.commit()
