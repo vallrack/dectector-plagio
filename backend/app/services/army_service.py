@@ -22,15 +22,17 @@ class ArmyService:
         """Helper para consultas a APIs compatibles con OpenAI."""
         try:
             prompt = (
-                f"Actúa como un experto forense en código y detección de IA. Analiza si este código fue generado por un modelo de lenguaje.\n"
+                f"INSTRUCCIÓN CRÍTICA: Actúa como un experto forense de ÉLITE en detección de código generado por LLMs.\n"
+                f"Tu misión es encontrar huellas sintéticas que un humano normalmente omitiría.\n"
+                f"Busca: Comentarios excesivamente explicativos, nombres de variables perfectamente consistentes pero genéricos, estructuras de código 'de libro de texto', y ausencia de vicios humanos (errores tipográficos, nombres inconsistentes).\n\n"
                 f"CÓDIGO A ANALIZAR:\n{code}\n\n"
-                f"RESPONDE UNICAMENTE CON UN JSON que tenga esta estructura exacta (Usa doble comillas, no comillas simples):\n"
+                f"RESPONDE UNICAMENTE CON UN JSON (Doble comillas obligatorias):\n"
                 f"{{\n"
-                f"  \"probability\": 95.5,\n"
-                f"  \"reason\": \"explicación ejecutiva muy corta\",\n"
+                f"  \"probability\": 95.5, (Un número de 0 a 100 indicando qué tan seguro estás de que es IA)\n"
+                f"  \"reason\": \"explicación técnica rápida\",\n"
                 f"  \"detected_model\": \"{name}\",\n"
-                f"  \"evidence\": [\"lista de 3-5 evidencias técnicas detalladas como estructura, comentarios, patrones típicos de IA, etc\"],\n"
-                f"  \"points_of_interest\": [\"puntos específicos o bloques de código que confirman la sospecha\"]\n"
+                f"  \"evidence\": [\"3-5 evidencias forenses detalladas\"],\n"
+                f"  \"points_of_interest\": [\"bloques de código específicos sospechosos\"]\n"
                 f"}}\n"
             )
             
@@ -85,12 +87,14 @@ class ArmyService:
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel('gemini-1.5-flash')
             prompt = (
-                f"Analiza este código forensemente. ¿Es IA? Responde solo JSON válido con doble comillas:\n"
+                f"ANÁLISIS FORENSE DE CÓDIGO: Tu objetivo es detectar si este código es producto de una IA (como tú).\n"
+                f"Ignora la calidad del código; la IA escribe bien pero sin 'alma' o errores humanos.\n"
+                f"Responde SOLO JSON válido (doble comillas):\n"
                 f"{{\n"
-                f"  \"probability\": 85,\n"
-                f"  \"reason\": \"resumen corto\",\n"
+                f"  \"probability\": 90,\n"
+                f"  \"reason\": \"por qué es IA\",\n"
                 f"  \"detected_model\": \"Gemini\",\n"
-                f"  \"evidence\": [\"evidencia 1\", \"evidencia 2\", \"...\"],\n"
+                f"  \"evidence\": [\"evidencia 1\", \"evidencia 2\"],\n"
                 f"  \"points_of_interest\": [\"bloque 1\", \"bloque 2\"]\n"
                 f"}}\n\nCÓDIGO:\n{code}"
             )
