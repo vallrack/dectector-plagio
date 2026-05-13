@@ -23,15 +23,16 @@ class ArmyService:
         try:
             prompt = (
                 f"INSTRUCCIÓN CRÍTICA: Actúa como un experto forense de ÉLITE en detección de código generado por LLMs.\n"
-                f"Tu misión es encontrar huellas sintéticas que un humano normalmente omitiría.\n"
-                f"Busca: Comentarios excesivamente explicativos, nombres de variables perfectamente consistentes pero genéricos, estructuras de código 'de libro de texto', y ausencia de vicios humanos (errores tipográficos, nombres inconsistentes).\n\n"
+                f"Tu misión es encontrar huellas sintéticas que un humano normalmente omitiría.\n\n"
+                f"REGLA DE ORO: DEBES RESPONDER COMPLETAMENTE EN ESPAÑOL.\n"
+                f"Busca: Comentarios excesivamente explicativos, nombres de variables perfectamente consistentes pero genéricos, estructuras de código 'de libro de texto', y ausencia de vicios humanos.\n\n"
                 f"CÓDIGO A ANALIZAR:\n{code}\n\n"
                 f"RESPONDE UNICAMENTE CON UN JSON (Doble comillas obligatorias):\n"
                 f"{{\n"
-                f"  \"probability\": 95.5, (Un número de 0 a 100 indicando qué tan seguro estás de que es IA)\n"
-                f"  \"reason\": \"explicación técnica rápida\",\n"
+                f"  \"probability\": 95.5,\n"
+                f"  \"reason\": \"explicación técnica detallada en español\",\n"
                 f"  \"detected_model\": \"{name}\",\n"
-                f"  \"evidence\": [\"3-5 evidencias forenses detalladas\"],\n"
+                f"  \"evidence\": [\"mínimo 3 evidencias forenses muy detalladas en español\"],\n"
                 f"  \"points_of_interest\": [\"bloques de código específicos sospechosos\"]\n"
                 f"}}\n"
             )
@@ -213,7 +214,13 @@ class ArmyService:
         if not tasks:
             return {"army_score": 0, "army_verdict": "Sin llaves configuradas", "army_details": []}
             
-        results = await asyncio.gather(*tasks)
+        # Ejecutar con timeout de 20 segundos por archivo para no colgar el sistema
+        try:
+            results = await asyncio.wait_for(asyncio.gather(*tasks), timeout=20.0)
+        except asyncio.TimeoutError:
+            print("Timeout en consultas del ejército")
+            results = []
+            
         valid_results = [r for r in results if r is not None]
         
         if not valid_results:

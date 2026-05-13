@@ -131,50 +131,62 @@ class FileProcessor:
     # ── process_zip ──────────────────────────────────────────────────────────
     @staticmethod
     async def process_zip(zip_content: bytes, project_id: int):
-        """Decompress a ZIP in memory and analyse every supported file."""
+        """Decompress a ZIP in memory and analyse every supported file in parallel."""
         from ..services.document_extractor import DocumentExtractor
         from ..models.database import engine, ACTIVE_DB_NAME
         from ..core.logger import add_debug_log
-        
-        add_debug_log(f"Iniciando tarea ZIP para proyecto {project_id} en {ACTIVE_DB_NAME}")
-        
-        try:
-            with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
-                files_in_zip = z.namelist()
-                add_debug_log(f"ZIP detectado con {len(files_in_zip)} entradas.")
-                
-                processed = 0
-                for filename in files_in_zip:
-                    # Ignorar basura
-                    if filename.startswith("__MACOSX/") or "/." in filename or filename.endswith("/"):
-                        continue
+        import asyncio
 
-                    # Extraer y decodificar
-                    with z.open(filename) as f:
-                        content_bytes = f.read()
+        add_debug_log(f"Iniciando tarea ZIP PARALELA para proyecto {project_id} en {ACTIVE_DB_NAME}")
+        
+        # Limitamos a 3 archivos simultáneos para no saturar memoria ni APIs
+        semaphore = asyncio.Semaphore(3)
 
+        async def analyze_and_save(filename, content_bytes):
+            async with semaphore:
+                try:
                     content = DocumentExtractor.extract_text(filename, content_bytes)
                     if not content or len(content.strip()) < 10:
-                        continue
+                        return False
 
                     ext = filename.split(".")[-1].lower() if "." in filename else "txt"
                     
-                    # 1. Analizar (Llamada a IA)
                     add_debug_log(f"Analizando: {filename}...")
                     analysis, analysis_engine = await FileProcessor._run_analysis(content)
                     
-                    # 2. Guardar inmediatamente (para liberar memoria)
-                    # Usamos una sesión nueva para cada archivo para evitar timeouts largos
                     with Session(engine) as session:
                         code_file = FileProcessor._build_code_file(
                             filename, ext, content, project_id, analysis, analysis_engine
                         )
                         session.add(code_file)
                         session.commit()
-                        processed += 1
-                        add_debug_log(f"Guardado OK: {filename} (Score: {analysis['score']})")
+                    
+                    add_debug_log(f"Completado: {filename} (Score: {analysis['score']})")
+                    return True
+                except Exception as e:
+                    add_debug_log(f"Error en archivo {filename}: {str(e)}")
+                    return False
 
-            # 3. Finalizar proyecto
+        try:
+            tasks = []
+            with zipfile.ZipFile(io.BytesIO(zip_content)) as z:
+                files_in_zip = z.namelist()
+                add_debug_log(f"Preparando {len(files_in_zip)} archivos...")
+                
+                for filename in files_in_zip:
+                    if filename.startswith("__MACOSX/") or "/." in filename or filename.endswith("/"):
+                        continue
+
+                    with z.open(filename) as f:
+                        content_bytes = f.read()
+                    
+                    tasks.append(analyze_and_save(filename, content_bytes))
+
+            # Ejecutar todas las tareas en paralelo (con el límite del semáforo)
+            results = await asyncio.gather(*tasks)
+            processed_count = sum(1 for r in results if r)
+
+            # Finalizar proyecto
             with Session(engine) as session:
                 project = session.get(Project, project_id)
                 if project:
@@ -187,7 +199,7 @@ class FileProcessor:
                     project.status = "completed"
                     session.add(project)
                     session.commit()
-                    add_debug_log(f"PROYECTO FINALIZADO: {processed} archivos procesados.")
+                    add_debug_log(f"ZIP FINALIZADO: {processed_count} archivos procesados con éxito.")
 
         except Exception as e:
             import traceback
