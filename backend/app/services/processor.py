@@ -59,6 +59,13 @@ class FileProcessor:
         army_keys = ["OPENAI_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY", "DEEPSEEK_API_KEY", "ANTHROPIC_API_KEY"]
         has_army = any(os.getenv(k) for k in army_keys)
 
+        if analysis.get("is_filler"):
+            logger.info("Texto de relleno detectado (ej. =rand()). Se omite el Ejército de IA y Copyleaks.")
+            analysis["reasoning"] = "Se detectó texto repetitivo o de prueba (posible =rand() o Lorem Ipsum). Se descarta autoría de IA."
+            analysis["score"] = 0  # Force 0 to be completely safe
+            analysis["is_suspicious"] = False
+            has_army = False # Prevent Army execution
+
         if has_army:
             logger.info("Consultando al Ejército de IA...")
             army_result = await ArmyService.get_consensus(content)

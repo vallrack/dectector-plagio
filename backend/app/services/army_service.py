@@ -196,6 +196,71 @@ class ArmyService:
             return None
 
     @classmethod
+    async def _get_judge_verdict(cls, opinions: List[Dict[str, Any]], code: str) -> Dict[str, Any]:
+        """
+        Un modelo principal actúa de juez leyendo el código y el veredicto de los demás.
+        Intentará usar OpenAI primero, luego Anthropic, luego Gemini, el que esté disponible.
+        """
+        opinions_text = "\n\n".join([
+            f"Modelo del Jurado: {op.get('detected_model', 'Desconocido')}\n"
+            f"Probabilidad de IA: {op.get('probability', 0)}%\n"
+            f"Razonamiento: {op.get('reason', '')}\n"
+            f"Evidencias: {', '.join(op.get('evidence', []))}"
+            for op in opinions
+        ])
+
+        prompt = (
+            f"INSTRUCCIÓN CRÍTICA: Eres el JUEZ FINAL de la Corte Suprema de IA forense.\n"
+            f"Varios expertos (el Jurado) han analizado un código o texto sospechoso. Tu misión es leer sus opiniones, revisar el contenido original tú mismo, "
+            f"y emitir un veredicto FINAL y DEFINITIVO sobre si el texto fue generado por IA o por un Humano.\n\n"
+            f"OPINIONES DEL JURADO:\n{opinions_text}\n\n"
+            f"CONTENIDO ORIGINAL A ANALIZAR:\n{code}\n\n"
+            f"REGLA DE ORO: Si hay discrepancia en el jurado, analiza profundamente para desempatar. Si todos concuerdan pero crees que se equivocan (ej. es solo un texto de prueba repetitivo como Lorem Ipsum), DEBES contradecirlos.\n"
+            f"RESPONDE UNICAMENTE CON UN JSON VÁLIDO EN ESPAÑOL (Doble comillas obligatorias):\n"
+            f"{{\n"
+            f"  \"probability\": 90,\n"
+            f"  \"reason\": \"Resumen del veredicto final del juez tras analizar el dictamen de los demás...\",\n"
+            f"  \"detected_model\": \"Nombre del modelo responsable (o 'Humano')\",\n"
+            f"  \"evidence\": [\"Evidencia clave confirmada\"]\n"
+            f"}}\n"
+        )
+
+        try:
+            # Seleccionar Juez por disponibilidad de llave
+            if os.getenv("OPENAI_API_KEY"):
+                client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+                response = await client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[{"role": "system", "content": "Eres el Juez Supremo Forense."},
+                              {"role": "user", "content": prompt}],
+                )
+                text = response.choices[0].message.content
+            elif os.getenv("ANTHROPIC_API_KEY"):
+                client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+                response = await client.messages.create(
+                    model="claude-3-5-sonnet-20240620",
+                    max_tokens=1000,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                text = response.content[0].text
+            elif os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY"):
+                api_k = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_GENAI_API_KEY")
+                genai.configure(api_key=api_k)
+                model = genai.GenerativeModel('gemini-1.5-pro')
+                response = await model.generate_content_async(prompt)
+                text = response.text
+            else:
+                return None
+
+            if "```json" in text:
+                text = text.split("```json")[1].split("```")[0].strip()
+            
+            return json.loads(text)
+        except Exception as e:
+            print(f"Error en Juez Final: {e}")
+            return None
+
+    @classmethod
     async def get_consensus(cls, code: str) -> Dict[str, Any]:
         """
         Ejecuta las consultas disponibles en paralelo.
@@ -225,11 +290,36 @@ class ArmyService:
         
         if not valid_results:
             return {"army_score": 0, "army_verdict": "Error en consultas", "army_details": []}
-            
-        avg_score = sum(r.get("probability", 0) for r in valid_results) / len(valid_results)
-        
-        return {
-            "army_score": round(avg_score, 2),
-            "army_verdict": "Plagio detectado por Ejército" if avg_score > 60 else "Parece Humano",
-            "army_details": valid_results
-        }
+
+        # --- FASE 2: EL JUEZ ---
+        # Si solo hay 1 modelo, el juez es redundante
+        if len(valid_results) == 1:
+            avg_score = valid_results[0].get("probability", 0)
+            return {
+                "army_score": round(avg_score, 2),
+                "army_verdict": valid_results[0].get("reason", "Dictamen único"),
+                "army_details": valid_results
+            }
+
+        judge_result = await cls._get_judge_verdict(valid_results, code)
+
+        if judge_result:
+            final_score = judge_result.get("probability", 0)
+            # Agregar el dictamen del juez al principio de los detalles
+            judge_result["detected_model"] = f"⚖️ JUEZ SUPREMO ({judge_result.get('detected_model', 'IA')})"
+            judge_result["points_of_interest"] = ["Veredicto basado en consenso"]
+            valid_results.insert(0, judge_result)
+
+            return {
+                "army_score": round(final_score, 2),
+                "army_verdict": judge_result.get("reason", "Veredicto Conjunto"),
+                "army_details": valid_results
+            }
+        else:
+            # Fallback al promedio si el juez falla por timeout/error
+            avg_score = sum(r.get("probability", 0) for r in valid_results) / len(valid_results)
+            return {
+                "army_score": round(avg_score, 2),
+                "army_verdict": "Plagio detectado por Ejército (Promedio)" if avg_score > 60 else "Parece Humano",
+                "army_details": valid_results
+            }
