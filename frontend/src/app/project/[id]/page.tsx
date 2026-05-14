@@ -259,6 +259,25 @@ export default function ProjectDetailPage() {
     document.body.removeChild(link);
   };
 
+  const handleIndult = async () => {
+    if (!selectedFile) return;
+    const confirmIndult = window.confirm(
+      "¿Estás seguro de que deseas absolver este archivo?\n\n" +
+      "Esto sobrescribirá el análisis de la IA, lo marcará como 'Validado por Docente' y pondrá el riesgo en 0%. Esta acción quedará registrada en el reporte."
+    );
+    if (!confirmIndult) return;
+
+    try {
+      await axios.post(getApiUrl(`file/${selectedFile.id}/indult`));
+      // Refresh project to get new scores
+      fetchProject();
+      alert("El archivo ha sido validado exitosamente como Humano.");
+    } catch (err) {
+      console.error(err);
+      alert("Hubo un error al intentar indultar el archivo.");
+    }
+  };
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-[1600px] mx-auto py-6 px-4 md:px-8">
 
@@ -406,7 +425,7 @@ export default function ProjectDetailPage() {
                 className="glass-panel rounded-3xl p-4 md:p-8 flex flex-col h-full overflow-hidden"
               >
                 {/* File header */}
-                <div className="flex items-start justify-between mb-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                   <div>
                     <h2 className="text-2xl font-bold mb-2 break-all">{selectedFile.filename}</h2>
                     <div className="flex items-center gap-3">
@@ -418,9 +437,20 @@ export default function ProjectDetailPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Veredicto IA</span>
-                    <Semaphore score={selectedFile.ai_score} size="md" />
+                  <div className="flex items-center gap-6">
+                    {selectedFile.ai_score > 20 && (
+                      <button
+                        onClick={handleIndult}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/30 rounded-xl text-xs font-bold transition-all shadow-[0_0_15px_rgba(34,197,94,0.1)]"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        Validar como Humano
+                      </button>
+                    )}
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2">Veredicto IA</span>
+                      <Semaphore score={selectedFile.ai_score} size="md" />
+                    </div>
                   </div>
                 </div>
 

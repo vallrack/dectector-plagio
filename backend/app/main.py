@@ -198,3 +198,69 @@ def download_report(project_id: int, session: Session = Depends(get_session)):
             "Access-Control-Expose-Headers": "Content-Disposition"
         }
     )
+
+@app.post("/file/{file_id}/indult")
+def indult_file(
+    file_id: int, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    import json
+    file = session.get(CodeFile, file_id)
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    project = session.get(Project, file.project_id)
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    # Indulto Docente
+    file.ai_score = 0.0
+    file.entropy = 6.0
+    file.is_ai_generated = False
+    file.detected_model = "👨‍🏫 Validado por Docente"
+    file.detected_brand = "Validación Humana"
+    file.detected_version = None
+    file.attribution_confidence = 100.0
+    file.brand_color = "#22C55E"
+    
+    # Agregar nota al análisis
+    analysis_data = {"reason": "El docente ha validado manualmente este archivo como humano, sobreescribiendo el análisis automático."}
+    file.ai_analysis = json.dumps(analysis_data)
+    
+    session.add(file)
+    session.commit()
+    
+    # Recalcular score global
+    files = session.exec(select(CodeFile).where(CodeFile.project_id == project.id)).all()
+    if files:
+        avg_score = sum(f.ai_score for f in files) / len(files)
+        project.overall_score = round(avg_score, 2)
+        session.add(project)
+        session.commit()
+        
+    return {"message": "File indulted successfully", "new_score": project.overall_score}
+
+@app.delete("/project/{project_id}")
+def delete_project(
+    project_id: int, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    project = session.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    if project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+        
+    # Delete all associated CodeFiles first
+    files = session.exec(select(CodeFile).where(CodeFile.project_id == project.id)).all()
+    for f in files:
+        session.delete(f)
+        
+    # Delete the project
+    session.delete(project)
+    session.commit()
+    
+    return {"message": "Project deleted successfully"}

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { LayoutDashboard, FileCode, Clock, ArrowRight, Search, FileText, Plus, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, FileCode, Clock, ArrowRight, Search, FileText, Plus, ShieldAlert, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '@/lib/api';
@@ -43,6 +43,21 @@ export default function DashboardPage() {
       console.error('Error fetching projects:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteProject = async (id: number) => {
+    const confirmDelete = window.confirm(
+      "¿Estás seguro de que deseas eliminar este análisis?\n\nEsta acción borrará el proyecto y todos sus reportes de IA permanentemente."
+    );
+    if (!confirmDelete) return;
+
+    try {
+      await api.delete(`/project/${id}`);
+      setProjects(projects.filter(p => p.id !== id));
+    } catch (err) {
+      console.error('Error deleting project:', err);
+      alert('Ocurrió un error al intentar eliminar el proyecto.');
     }
   };
 
@@ -171,11 +186,20 @@ export default function DashboardPage() {
                         <span className="text-sm text-muted-foreground">ID #{project.id}</span>
                       </td>
                       <td className="px-8 py-6 text-right">
-                        <Link href={`/project/${project.id}`}>
-                          <button className="p-3 hover:bg-primary/10 rounded-xl transition-all text-muted-foreground hover:text-primary group/btn">
-                            <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
+                        <div className="flex items-center justify-end gap-2">
+                          <Link href={`/project/${project.id}`}>
+                            <button className="p-3 hover:bg-primary/10 rounded-xl transition-all text-muted-foreground hover:text-primary group/btn" title="Ver detalle">
+                              <ArrowRight className="w-5 h-5 group-hover/btn:translate-x-1 transition-transform" />
+                            </button>
+                          </Link>
+                          <button 
+                            onClick={() => handleDeleteProject(project.id)}
+                            className="p-3 hover:bg-red-500/10 rounded-xl transition-all text-muted-foreground hover:text-red-400 group/del" 
+                            title="Eliminar proyecto"
+                          >
+                            <Trash2 className="w-5 h-5 group-hover/del:scale-110 transition-transform" />
                           </button>
-                        </Link>
+                        </div>
                       </td>
                     </motion.tr>
                   ))}
