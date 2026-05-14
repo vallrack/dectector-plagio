@@ -23,9 +23,9 @@ class ArmyService:
         try:
             prompt = (
                 f"INSTRUCCIÓN CRÍTICA: Actúa como un experto forense de ÉLITE en detección de código generado por LLMs.\n"
-                f"Tu misión es encontrar huellas sintéticas que un humano normalmente omitiría.\n\n"
-                f"REGLA DE ORO: DEBES RESPONDER COMPLETAMENTE EN ESPAÑOL.\n"
-                f"Busca: Comentarios excesivamente explicativos, nombres de variables perfectamente consistentes pero genéricos, estructuras de código 'de libro de texto', y ausencia de vicios humanos.\n\n"
+                f"Tu misión es encontrar huellas sintéticas inconfundibles que un humano normalmente omitiría.\n\n"
+                f"REGLA ESTRICTA ANTI-FALSO POSITIVO: NO asumas que un código es IA solo porque está ordenado, usa variables comunes (i, result, count) o sigue un tutorial de 'libro de texto'. Los estudiantes escriben así.\n"
+                f"Para emitir una probabilidad mayor a 60%, DEBES identificar la FIRMA EXACTA de un modelo (ej. comentarios de pasos narrativos de ChatGPT, estilo hiper-condensado de Gemini, o verbosidad extrema de Claude). Si no hay una firma clara, asume que es HUMANO.\n\n"
                 f"CÓDIGO A ANALIZAR:\n{code}\n\n"
                 f"RESPONDE UNICAMENTE CON UN JSON (Doble comillas obligatorias):\n"
                 f"{{\n"
@@ -89,7 +89,7 @@ class ArmyService:
             model = genai.GenerativeModel('gemini-1.5-flash')
             prompt = (
                 f"ANÁLISIS FORENSE DE CÓDIGO: Tu objetivo es detectar si este código es producto de una IA (como tú).\n"
-                f"Ignora la calidad del código; la IA escribe bien pero sin 'alma' o errores humanos.\n"
+                f"REGLA ESTRICTA: NO marques un código como IA solo porque es ordenado o usa variables genéricas. Los estudiantes escriben así. Para una alta probabilidad, DEBES encontrar la FIRMA EXACTA de un modelo IA (ej. tu estilo, el de GPT, Claude). Si no ves una firma clara, asume que es Humano.\n"
                 f"Responde SOLO JSON válido (doble comillas):\n"
                 f"{{\n"
                 f"  \"probability\": 90,\n"
@@ -115,7 +115,7 @@ class ArmyService:
         try:
             client = AsyncGroq(api_key=api_key)
             prompt = (
-                f"Expert AI Detection. Analyze this code. Response must be valid JSON only (use double quotes):\n"
+                f"Expert AI Detection. Analyze this code. STRICT RULE: Do not flag as AI just because it's clean, uses textbook patterns, or simple variables (like 'i', 'result'). Students code like this. To give >60% probability, you MUST identify an EXACT AI model signature (like ChatGPT narrative steps, Gemini condensed style). Otherwise, assume Human. Response must be valid JSON only (use double quotes):\n"
                 f"{{\n"
                 f"  \"probability\": 80,\n"
                 f"  \"reason\": \"brief explanation\",\n"
@@ -144,6 +144,7 @@ class ArmyService:
             client = AsyncAnthropic(api_key=api_key)
             prompt = (
                 f"Actúa como analista forense de IA. Analiza este código y determina si fue generado por un modelo de lenguaje.\n"
+                f"REGLA ESTRICTA ANTI-FALSOS POSITIVOS: Los estudiantes humanos a menudo escriben código genérico, ordenado o 'de libro de texto'. NO marques esto como IA solo por eso. Para una probabilidad alta (>60%), DEBES identificar una FIRMA EXACTA e inconfundible de IA (ej. verbosidad típica tuya, o estilo de GPT). Si no, es Humano.\n"
                 f"CÓDIGO:\n{code}\n\n"
                 f"Responde SOLO con un JSON válido (usa doble comillas):\n"
                 f"{{\n"
@@ -174,7 +175,7 @@ class ArmyService:
         try:
             co = cohere.AsyncClient(api_key=api_key)
             prompt = (
-                f"Analiza si este código es generado por IA. Responde solo JSON:\n"
+                f"Analiza si este código es generado por IA. REGLA ESTRICTA: No lo marques como IA solo porque esté bien indentado o use variables comunes. Exige encontrar una firma exacta de un LLM (estilo narrativo, comentarios excesivos). Si no, asume Humano. Responde solo JSON:\n"
                 f"{{\n"
                 f"  \"probability\": 80,\n"
                 f"  \"reason\": \"resumen\",\n"
@@ -215,7 +216,7 @@ class ArmyService:
             f"y emitir un veredicto FINAL y DEFINITIVO sobre si el texto fue generado por IA o por un Humano.\n\n"
             f"OPINIONES DEL JURADO:\n{opinions_text}\n\n"
             f"CONTENIDO ORIGINAL A ANALIZAR:\n{code}\n\n"
-            f"REGLA DE ORO: Si hay discrepancia en el jurado, analiza profundamente para desempatar. Si todos concuerdan pero crees que se equivocan (ej. es solo un texto de prueba repetitivo como Lorem Ipsum), DEBES contradecirlos.\n"
+            f"REGLA DE ORO ANTI-FALSO POSITIVO: Los estudiantes humanos a menudo escriben código 'de libro de texto' con variables genéricas (i, x, result). Si el jurado condenó el código basándose solo en que 'es muy ordenado' o 'no tiene errores humanos', DEBES CONTRADECIRLOS y bajar la probabilidad drásticamente. Para confirmar que es IA, debes poder identificar la FIRMA EXACTA de un LLM específico (ej. los comentarios narrativos de GPT, la verbosidad de Claude).\n"
             f"RESPONDE UNICAMENTE CON UN JSON VÁLIDO EN ESPAÑOL (Doble comillas obligatorias):\n"
             f"{{\n"
             f"  \"probability\": 90,\n"
